@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NovaPanel</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js">
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', 'PingFang SC', Roboto, 'Helvetica Neue', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            overflow: hidden;
+        }
+
+        /* ===== 加载页 ===== */
+        #loading-page {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0d1117;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+        #loading-page.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        .loader {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            animation: float 2s ease-in-out infinite;
+        }
+        .loader .circle {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-top-color: #58a6ff;
+            border-right-color: #3fb950;
+            animation: spin 1.2s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite;
+        }
+        .loader .circle:nth-child(2) {
+            width: 60%;
+            height: 60%;
+            top: 20%;
+            left: 20%;
+            border-top-color: #f0883e;
+            border-right-color: #f778ba;
+            animation-duration: 0.9s;
+            animation-direction: reverse;
+        }
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        @keyframes float {
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-12px);
+            }
+        }
+        .loading-text {
+            margin-top: 30px;
+            font-size: 18px;
+            color: #8b949e;
+            font-weight: 500;
+            letter-spacing: 2px;
+            animation: pulseText 1.5s ease-in-out infinite;
+        }
+        @keyframes pulseText {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* ===== 主容器 ===== */
+        #app {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        #app.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ===== 安装页 ===== */
+        .install-card {
+            background: #161b22;
+            border-radius: 24px;
+            padding: 50px 48px 40px;
+            border: 1px solid #30363d;
+            width: 520px;
+            max-width: 94%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .install-card .logo-big {
+            font-size: 52px;
+            font-weight: 900;
+            font-style: italic;
+            background: linear-gradient(135deg, #58a6ff, #3fb950, #f0883e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+            margin-bottom: 6px;
+        }
+        .install-card .logo-sub {
+            color: #8b949e;
+            font-size: 14px;
+            margin-bottom: 24px;
+            -webkit-text-fill-color: #8b949e;
+        }
+        .install-card .divider-line {
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, #58a6ff, #3fb950);
+            margin: 0 auto 28px auto;
+            border-radius: 4px;
+        }
+        .install-card .welcome-icon {
+            font-size: 72px;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .install-card .welcome-title {
+            font-size: 26px;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin-bottom: 8px;
+        }
+        .install-card .welcome-desc {
+            color: #8b949e;
+            font-size: 15px;
+            line-height: 1.8;
+            max-width: 380px;
+            margin: 0 auto 28px auto;
+        }
+        .install-card .welcome-desc .tag {
+            display: inline-block;
+            background: #21262d;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #58a6ff;
+            margin: 0 2px;
+        }
+        .btn-install {
+            padding: 14px 48px;
+            background: linear-gradient(135deg, #238636, #2ea043);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s;
+            box-shadow: 0 4px 16px rgba(46, 160, 67, 0.25);
+        }
+        .btn-install:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(46, 160, 67, 0.35);
+            background: linear-gradient(135deg, #2ea043, #3fb950);
+        }
+        .install-card .footer-info {
+            margin-top: 28px;
+            font-size: 12px;
+            color: #484f58;
+            border-top: 1px solid #21262d;
+            padding-top: 20px;
+        }
+
+        /* ===== 登录/创建账号页 ===== */
+        .login-card {
+            background: #161b22;
+            border-radius: 16px;
+            padding: 40px 36px 36px;
+            border: 1px solid #30363d;
+            width: 420px;
+            max-width: 94%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .login-header .login-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #f0f6fc;
+            margin-bottom: 6px;
+        }
+        .login-header .login-desc {
+            font-size: 14px;
+            color: #8b949e;
+            line-height: 1.6;
+        }
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #484f58;
+        }
+        .login-footer a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== 表单 ===== */
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #c9d1d9;
+            margin-bottom: 6px;
+        }
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .password-wrapper input {
+            width: 100%;
+            padding: 14px 50px 14px 18px;
+            border: 2px solid #30363d;
+            border-radius: 12px;
+            font-size: 15px;
+            background: #0d1117;
+            transition: border-color 0.25s, box-shadow 0.25s;
+            outline: none;
+            color: #c9d1d9;
+            font-weight: 500;
+        }
+        .password-wrapper input:focus {
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.15);
+        }
+        .password-wrapper input::placeholder {
+            color: #484f58;
+        }
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #30363d;
+            border-radius: 12px;
+            font-size: 15px;
+            background: #0d1117;
+            transition: border-color 0.25s, box-shadow 0.25s;
+            outline: none;
+            color: #c9d1d9;
+            font-weight: 500;
+        }
+        .form-group input[type="text"]:focus {
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.15);
+        }
+        .form-group input[type="text"]::placeholder {
+            color: #484f58;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #484f58;
+            transition: color 0.2s;
+        }
+        .password-toggle:hover {
+            color: #8b949e;
+        }
+        .input-hint {
+            font-size: 12px;
+            color: #484f58;
+            margin-top: 4px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .input-hint .valid {
+            color: #3fb950;
+        }
+        .input-hint .invalid {
+            color: #f85149;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #238636, #2ea043);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.25s;
+            margin-top: 4px;
+            box-shadow: 0 4px 16px rgba(46, 160, 67, 0.2);
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(46, 160, 67, 0.3);
+            background: linear-gradient(135deg, #2ea043, #3fb950);
+        }
+        .btn-login:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #1c2a1e;
+            border: 1px solid #238636;
+            color: #3fb950;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 18px;
+            animation: shake 0.4s ease;
+        }
+        .toast.error {
+            background: #2d1b1e;
+            border-color: #f85149;
+            color: #f85149;
+        }
+        .toast .toast-emoji {
+            font-size: 20px;
+        }
+        @keyframes shake {
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+            20% {
+                transform: translateX(-6px);
+            }
+            40% {
+                transform: translateX(6px);
+            }
+            60% {
+                transform: translateX(-4px);
+            }
+            80% {
+                transform: translateX(4px);
+            }
+        }
+
+        /* ============================================================ */
+        /* 管理面板布局 */
+        /* ============================================================ */
+        .dashboard-wrapper {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            background: #0d1117;
+            position: fixed;
+            top: 0;
+            left: 0;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 220px;
+            min-width: 220px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .sidebar-logo {
+            padding: 20px 20px 16px 20px;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 16px;
+        }
+        .sidebar-logo .logo-text {
+            font-size: 24px;
+            font-weight: 900;
+            font-style: italic;
+            background: linear-gradient(135deg, #58a6ff, #3fb950, #f0883e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+        .sidebar-logo .logo-sub {
+            font-size: 11px;
+            color: #484f58;
+            font-weight: 400;
+            margin-top: 2px;
+            -webkit-text-fill-color: #484f58;
+        }
+        .sidebar-menu {
+            flex: 1;
+            padding: 0 12px;
+        }
+        .sidebar-menu .menu-label {
+            font-size: 11px;
+            color: #484f58;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 8px 12px;
+            font-weight: 600;
+        }
+        .sidebar-menu .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            color: #8b949e;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        .sidebar-menu .menu-item:hover {
+            background: #21262d;
+            color: #c9d1d9;
+        }
+        .sidebar-menu .menu-item.active {
+            background: #21262d;
+            color: #f0f6fc;
+        }
+        .sidebar-menu .menu-item .icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .sidebar-menu .menu-item .label {
+            flex: 1;
+        }
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #30363d;
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+        .sidebar-footer .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sidebar-footer .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #58a6ff, #3fb950);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .sidebar-footer .user-name {
+            color: #c9d1d9;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .sidebar-footer .user-role {
+            color: #484f58;
+            font-size: 12px;
+        }
+        .sidebar-footer .logout-btn {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: #484f58;
+            cursor: pointer;
+            font-size: 18px;
+            transition: color 0.2s;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .sidebar-footer .logout-btn:hover {
+            color: #f85149;
+            background: #2d1b1e;
+        }
+        .main-content {
+            flex: 1;
+            padding: 20px 28px;
+            overflow-y: auto;
+            height: 100vh;
+            min-width: 0;
+        }
+        .main-content .page-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #f0f6fc;
+        }
+        .main-content .page-subtitle {
+            color: #8b949e;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .hot-reload-status {
+            font-size: 12px;
+            color: #3fb950;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            background: #161b22;
+            border-radius: 20px;
+            border: 1px solid #30363d;
+            white-space: nowrap;
+        }
+        .hot-reload-status .dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: #3fb950;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .hot-reload-status.disconnected {
+            color: #f85149;
+        }
+        .hot-reload-status.disconnected .dot {
+            background: #f85149;
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+        .placeholder-page {
+            text-align: center;
+            padding: 80px 0;
+            color: #484f58;
+        }
+        .placeholder-page .big-icon {
+            font-size: 72px;
+            margin-bottom: 16px;
+            display: block;
+        }
+        .placeholder-page h2 {
+            color: #c9d1d9;
+            font-weight: 600;
+            font-size: 24px;
+        }
+        .placeholder-page p {
+            color: #8b949e;
+            margin-top: 8px;
+            font-size: 15px;
+        }
+        .placeholder-page .coming-soon {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 4px 16px;
+            background: #21262d;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #58a6ff;
+        }
+
+        /* ============================================================ */
+        /* 数据监控 - 完整 MCSM 风格 */
+        /* ============================================================ */
+        .refresh-bar {
+            display: flex;
+            gap: 12px;
+            margin: 4px 0 12px 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn-refresh {
+            padding: 6px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+            background: #21262d;
+        }
+        .btn-refresh:hover {
+            background: #30363d;
+        }
+        .refresh-info {
+            color: #484f58;
+            font-size: 12px;
+        }
+
+        /* 系统信息总览 */
+        .sysinfo-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .sysinfo-item {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+        }
+        .sysinfo-item .label {
+            font-size: 11px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-weight: 500;
+        }
+        .sysinfo-item .value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #f0f6fc;
+            margin-top: 2px;
+        }
+        .sysinfo-item .value .sub {
+            font-weight: 400;
+            color: #8b949e;
+            font-size: 12px;
+            margin-left: 4px;
+        }
+        .sysinfo-item .value .highlight-yellow {
+            color: #d29922;
+        }
+
+        /* 4 状态卡片 */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .status-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+        .status-card .status-label {
+            font-size: 12px;
+            color: #8b949e;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        .status-card .status-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #f0f6fc;
+        }
+        .status-card .status-value .s-unit {
+            font-weight: 400;
+            color: #8b949e;
+            font-size: 13px;
+            margin-left: 2px;
+        }
+        .status-card .status-value .online {
+            color: #3fb950;
+        }
+        .status-card .status-sub {
+            font-size: 11px;
+            color: #484f58;
+            margin-top: 2px;
+        }
+        .status-card .status-progress {
+            width: 100%;
+            height: 4px;
+            background: #21262d;
+            border-radius: 4px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .status-card .status-progress .fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+
+        /* ===== 远程节点表格 ===== */
+        .section-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #f0f6fc;
+            margin-top: 16px;
+            margin-bottom: 4px;
+        }
+        .section-desc {
+            font-size: 12px;
+            color: #484f58;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        .node-table-wrap {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            min-height: 80px;
+        }
+        .node-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .node-table thead {
+            background: #0d1117;
+        }
+        .node-table th {
+            padding: 12px 14px;
+            text-align: left;
+            color: #8b949e;
+            font-weight: 500;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border-bottom: 1px solid #30363d;
+        }
+        .node-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #21262d;
+            color: #c9d1d9;
+        }
+        .node-table tr:last-child td {
+            border-bottom: none;
+        }
+        .node-table .status-online {
+            color: #3fb950;
+            font-weight: 600;
+        }
+        .node-table .status-online::before {
+            content: "● ";
+        }
+        .node-table .status-offline {
+            color: #f85149;
+            font-weight: 600;
+        }
+        .node-table .status-offline::before {
+            content: "● ";
+        }
+
+        /* ===== 图表 2x2 ===== */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+        .chart-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 14px 16px 12px;
+        }
+        .chart-box .chart-title {
+            font-size: 13px;
+            color: #8b949e;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px;
+        }
+        .chart-box .chart-title .chart-value {
+            color: #f0f6fc;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .chart-box .chart-title .chart-value .u {
+            font-weight: 400;
+            color: #8b949e;
+            font-size: 12px;
+        }
+        .chart-box .chart-sub {
+            font-size: 11px;
+            color: #484f58;
+            margin-bottom: 8px;
+        }
+        .bar-chart-wrap {
+            display: flex;
+            align-items: flex-end;
+            height: 70px;
+            gap: 3px;
+            margin-top: 4px;
+        }
+        .bar-chart-wrap .bar-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+        }
+        .bar-chart-wrap .bar-item .bar {
+            width: 100%;
+            max-width: 20px;
+            min-height: 4px;
+            border-radius: 3px 3px 0 0;
+            transition: height 0.4s ease;
+        }
+        .bar-chart-wrap .bar-item .bar-label {
+            font-size: 8px;
+            color: #484f58;
+            margin-top: 3px;
+            white-space: nowrap;
+        }
+
+        /* ============================================================ */
+        /* 响应式 */
+        /* ============================================================ */
+        @media (max-width: 1024px) {
+            .sysinfo-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .status-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+                min-width: 60px;
+            }
+            .sidebar-logo {
+                padding: 16px 10px 12px 10px;
+            }
+            .sidebar-logo .logo-text {
+                font-size: 14px;
+                text-align: center;
+                display: block;
+            }
+            .sidebar-logo .logo-sub {
+                display: none;
+            }
+            .sidebar-menu .menu-item {
+                padding: 10px 12px;
+                justify-content: center;
+            }
+            .sidebar-menu .menu-item .label {
+                display: none;
+            }
+            .sidebar-menu .menu-label {
+                display: none;
+            }
+            .sidebar-footer .user-info .user-name {
+                display: none;
+            }
+            .sidebar-footer .user-info .user-role {
+                display: none;
+            }
+            .main-content {
+                padding: 14px 16px;
+            }
+            .sysinfo-grid {
+                grid-template-columns: 1fr;
+            }
+            .status-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .node-table-wrap {
+                overflow-x: auto;
+            }
+            .node-table {
+                font-size: 12px;
+                min-width: 600px;
+            }
+            .node-table th,
+            .node-table td {
+                padding: 8px 10px;
+            }
+        }
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 50px;
+                min-width: 50px;
+            }
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================================ -->
+    <!-- 加载页 -->
+    <!-- ============================================================ -->
+    <div id="loading-page">
+        <div class="loader">
+            <div class="circle"></div>
+            <div class="circle"></div>
+        </div>
+        <div class="loading-text">NovaPanel 加载中...</div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Vue 主应用 -->
+    <!-- ============================================================ -->
+    <div id="app">
+
+        <!-- ===== 安装页 ===== -->
+        <div v-if="currentPage === 'install' && !isLoggedIn" class="install-card">
+            <div class="logo-big">✦ NovaPanel</div>
+            <div class="logo-sub">✨ 新一代面板 · 轻量 · 高效</div>
+            <div class="divider-line"></div>
+            <span class="welcome-icon">🚀</span>
+            <div class="welcome-title">欢迎使用 NovaPanel</div>
+            <div class="welcome-desc">
+                开源 · 轻量 · 开箱即用<br />
+                支持 <span class="tag">Minecraft</span> 服务器和所有 <span class="tag">控制台程序</span> 的管理面板
+            </div>
+            <button class="btn-install" @click="goToCreateAccount">✨ 开始使用</button>
+            <div class="footer-info">💡 首次使用？创建管理员账号即可开始</div>
+        </div>
+
+        <!-- ===== 创建账号页 ===== -->
+        <div v-if="currentPage === 'install-step2' && !isLoggedIn" class="login-card">
+            <div class="login-header">
+                <div class="login-title">创建一个管理员账号</div>
+                <div class="login-desc">用户名支持任何语言，请务必保证您的密码安全。</div>
+            </div>
+            <div v-if="toast.show" class="toast" :class="toast.type">
+                <span class="toast-emoji">{{ toast.emoji }}</span>
+                <span>{{ toast.message }}</span>
+            </div>
+            <div class="form-group">
+                <label><span class="icon">👤</span> 用户名</label>
+                <input type="text" v-model="regUsername" placeholder="输入用户名" @keydown.enter="handleCreateAccount" />
+                <div class="input-hint">
+                    <span :class="isUsernameValid ? 'valid' : 'invalid'">
+                        {{ isUsernameValid ? '✅' : '⬜' }} 字母/数字/特殊符号
+                    </span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label><span class="icon">🔐</span> 密码</label>
+                <div class="password-wrapper">
+                    <input :type="showRegPassword ? 'text' : 'password'" v-model="regPassword" placeholder="输入密码，至少 6 位" @keydown.enter="handleCreateAccount" />
+                    <button type="button" class="password-toggle" @click="toggleRegPassword">
+                        {{ showRegPassword ? '🙈' : '👁️' }}
+                    </button>
+                </div>
+                <div class="input-hint">
+                    <span :class="isPasswordValid ? 'valid' : 'invalid'">
+                        {{ isPasswordValid ? '✅' : '⬜' }} 字母/数字/特殊符号，≥6位
+                    </span>
+                </div>
+            </div>
+            <button class="btn-login" @click="handleCreateAccount" :disabled="creating || !isUsernameValid || !isPasswordValid">
+                {{ creating ? '⏳ 创建中…' : '✨ 创建账号' }}
+            </button>
+            <div class="login-footer">已有账号？ <a href="#" @click.prevent="navigateTo('login')">去登录</a></div>
+        </div>
+
+        <!-- ===== 登录页 ===== -->
+        <div v-if="currentPage === 'login' && !isLoggedIn" class="login-card">
+            <div class="login-header">
+                <div class="login-title">欢迎回来</div>
+                <div class="login-desc">输入你的账号密码登录 NovaPanel</div>
+            </div>
+            <div v-if="toast.show" class="toast" :class="toast.type">
+                <span class="toast-emoji">{{ toast.emoji }}</span>
+                <span>{{ toast.message }}</span>
+            </div>
+            <div class="form-group">
+                <label><span class="icon">👤</span> 用户名</label>
+                <input type="text" v-model="username" placeholder="输入用户名" @keydown.enter="handleLogin" />
+            </div>
+            <div class="form-group">
+                <label><span class="icon">🔐</span> 密码</label>
+                <div class="password-wrapper">
+                    <input :type="showLoginPassword ? 'text' : 'password'" v-model="password" placeholder="输入密码" @keydown.enter="handleLogin" />
+                    <button type="button" class="password-toggle" @click="toggleLoginPassword">
+                        {{ showLoginPassword ? '🙈' : '👁️' }}
+                    </button>
+                </div>
+            </div>
+            <button class="btn-login" @click="handleLogin" :disabled="loggingIn">
+                {{ loggingIn ? '⏳ 登录中…' : '🚀 登录' }}
+            </button>
+            <div class="login-footer">还没账号？ <a href="#" @click.prevent="goToCreateAccount">去创建</a></div>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- 管理面板 -->
+        <!-- ========================================================== -->
+        <div v-if="isLoggedIn" class="dashboard-wrapper">
+
+            <!-- 左侧边栏 -->
+            <div class="sidebar">
+                <div class="sidebar-logo">
+                    <div class="logo-text">✦ NovaPanel</div>
+                    <div class="logo-sub">新一代面板 · 轻量 · 高效</div>
+                </div>
+                <div class="sidebar-menu">
+                    <div class="menu-label">基础功能</div>
+                    <div class="menu-item" :class="{ active: currentDashboardPage === 'monitor' }" @click="switchPage('monitor')">
+                        <span class="icon">📊</span>
+                        <span class="label">数据监控</span>
+                    </div>
+                    <div class="menu-item" :class="{ active: currentDashboardPage === 'servers' }" @click="switchPage('servers')">
+                        <span class="icon">🖥️</span>
+                        <span class="label">应用实例</span>
+                    </div>
+                    <div class="menu-item" :class="{ active: currentDashboardPage === 'users' }" @click="switchPage('users')">
+                        <span class="icon">👥</span>
+                        <span class="label">用户管理</span>
+                    </div>
+                    <div class="menu-item" :class="{ active: currentDashboardPage === 'settings' }" @click="switchPage('settings')">
+                        <span class="icon">⚙️</span>
+                        <span class="label">系统设置</span>
+                    </div>
+                </div>
+                <div class="sidebar-footer">
+                    <div class="user-info">
+                        <div class="user-avatar">{{ currentUser.charAt(0).toUpperCase() }}</div>
+                        <div style="flex:1; min-width:0;">
+                            <div class="user-name">{{ currentUser }}</div>
+                            <div class="user-role">管理员</div>
+                        </div>
+                        <button class="logout-btn" @click="handleLogout" title="退出登录">🚪</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主内容 -->
+            <div class="main-content">
+
+                <div class="top-bar">
+                    <div>
+                        <div class="page-title">{{ dashboardTitle }}</div>
+                        <div class="page-subtitle">{{ dashboardSubtitle }}</div>
+                    </div>
+                    <div class="hot-reload-status" :class="hotReloadConnected ? '' : 'disconnected'">
+                        <span class="dot"></span>
+                        {{ hotReloadStatus }}
+                    </div>
+                </div>
+
+                <!-- ========================================================== -->
+                <!-- 数据监控 -->
+                <!-- ========================================================== -->
+                <div v-if="currentDashboardPage === 'monitor'">
+
+                    <div class="refresh-bar">
+                        <button class="btn-refresh" @click="refreshAll">🔄 刷新</button>
+                        <span class="refresh-info">最后更新：{{ sysInfo.lastUpdate }}</span>
+                    </div>
+
+                    <!-- 系统信息总览 -->
+                    <div class="sysinfo-grid">
+                        <div class="sysinfo-item">
+                            <span class="label">🖥️ 系统类型</span>
+                            <span class="value">{{ sysInfo.os }} <span class="sub">({{ sysInfo.osVersion }})</span></span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">💻 计算机名称</span>
+                            <span class="value">{{ sysInfo.hostname }}</span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">👤 进程权限用户</span>
+                            <span class="value">{{ sysInfo.currentUser }}</span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">📦 面板版本</span>
+                            <span class="value">1.0.0 <span class="sub">(NovaPanel)</span></span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">🕐 面板端时间</span>
+                            <span class="value">{{ currentTime }}</span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">🧠 内存使用数值</span>
+                            <span class="value">
+                                <span class="highlight-yellow">{{ sysInfo.memUsed.toFixed(1) }}</span>
+                                <span class="sub">/ {{ sysInfo.memTotal.toFixed(1) }} GB</span>
+                            </span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">🚫 阻挡请求次数</span>
+                            <span class="value">0</span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">🚷 封禁 IP 数</span>
+                            <span class="value">0</span>
+                        </div>
+                        <div class="sysinfo-item">
+                            <span class="label">⏱️ 系统运行时间</span>
+                            <span class="value">{{ sysInfo.uptime }}</span>
+                        </div>
+                    </div>
+
+                    <!-- 4 状态卡片 -->
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <div class="status-label">🔗 节点在线状态</div>
+                            <div class="status-value">
+                                <span class="online">{{ onlineNodes }}</span><span class="s-unit">/ {{ totalNodes }}</span>
+                            </div>
+                            <div class="status-sub">已连接节点数 / 已配置节点数</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-label">📦 实例运行状态</div>
+                            <div class="status-value">
+                                <span class="online">{{ runningInstances }}</span><span class="s-unit">/ {{ totalInstances }}</span>
+                            </div>
+                            <div class="status-sub">正在运行数 / 全部实例总数</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-label">🔐 用户登录次数</div>
+                            <div class="status-value">
+                                <span class="highlight-yellow">0</span><span class="s-unit"> : 1</span>
+                            </div>
+                            <div class="status-sub">登录失败次数 · 登录成功次数</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-label">📊 操作系统负载</div>
+                            <div class="status-value" style="font-size:16px;">
+                                <span class="highlight-yellow">{{ Math.round(sysInfo.cpuUsage) }}%</span>
+                                <span class="s-unit">CPU</span>
+                                <span style="color:#8b949e; margin:0 4px;">·</span>
+                                <span class="highlight-yellow">{{ Math.round(sysInfo.memPercent) }}%</span>
+                                <span class="s-unit">RAM</span>
+                            </div>
+                            <div class="status-sub">面板所在主机 CPU · RAM 百分比</div>
+                            <div class="status-progress">
+                                <div class="fill" :style="{ width: Math.min(sysInfo.cpuUsage, 100) + '%', background: 'linear-gradient(90deg, #f0883e, #f778ba)' }"></div>
+                            </div>
+                            <div class="status-progress" style="margin-top:3px;">
+                                <div class="fill" :style="{ width: Math.min(sysInfo.memPercent, 100) + '%', background: 'linear-gradient(90deg, #58a6ff, #3fb950)' }"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ===== 远程节点总览 ===== -->
+                    <div class="section-title">🌐 远程节点总览</div>
+                    <div class="section-desc">
+                        确保所有远程节点均在线，离线状态将导致此远程节点以及相关功能不可用，可能会影响使用体验与数据。<br />
+                        面板端 1.0.0 必须对应远程节点 1.0.0 版本
+                    </div>
+                    <div class="node-table-wrap">
+                        <table class="node-table">
+                            <thead>
+                                <tr>
+                                    <th>IP 地址</th>
+                                    <th>端口</th>
+                                    <th>备注</th>
+                                    <th>CPU</th>
+                                    <th>内存</th>
+                                    <th>运行实例</th>
+                                    <th>远程节点版本</th>
+                                    <th>连接状态</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="node in nodes" :key="node.id">
+                                    <td>{{ node.ip }}</td>
+                                    <td>{{ node.port }}</td>
+                                    <td>{{ node.name }}</td>
+                                    <td>{{ Math.round(node.cpu) }}%</td>
+                                    <td>{{ node.memUsed }}GB / {{ node.memTotal }}GB</td>
+                                    <td>{{ node.running }}/{{ node.total }}</td>
+                                    <td>{{ node.version }}</td>
+                                    <td>
+                                        <span :class="node.status === 'online' ? 'status-online' : 'status-offline'">
+                                            {{ node.status === 'online' ? '在线' : '离线' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ===== 图表 2x2 ===== -->
+                    <div class="chart-grid">
+                        <!-- 面板端接口请求量 -->
+                        <div class="chart-box">
+                            <div class="chart-title">
+                                <span>📊 面板端接口请求量</span>
+                                <span class="chart-value">{{ requestTotal }}<span class="u"> 次</span></span>
+                            </div>
+                            <div class="chart-sub">每 1 分钟统计间隔，总计 1 小时的请求历史</div>
+                            <div class="bar-chart-wrap">
+                                <div class="bar-item" v-for="(val, idx) in requestHistory" :key="idx">
+                                    <div class="bar" :style="{ height: Math.max(val, 4) + '%', background: 'linear-gradient(180deg, #58a6ff, #3fb950)' }"></div>
+                                    <div class="bar-label">{{ requestLabels[idx] }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 面板端 CPU 使用率 -->
+                        <div class="chart-box">
+                            <div class="chart-title">
+                                <span>📊 面板端 CPU 使用率</span>
+                                <span class="chart-value">{{ Math.round(sysInfo.cpuUsage) }}<span class="u">%</span></span>
+                            </div>
+                            <div class="chart-sub">每 10 秒统计间隔，总计 10 分钟的 CPU 历史使用率</div>
+                            <div class="bar-chart-wrap">
+                                <div class="bar-item" v-for="(val, idx) in cpuHistory" :key="idx">
+                                    <div class="bar" :style="{ height: Math.max(val, 4) + '%', background: 'linear-gradient(180deg, #f0883e, #f778ba)' }"></div>
+                                    <div class="bar-label">{{ cpuLabels[idx] }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 应用实例运行量 -->
+                        <div class="chart-box">
+                            <div class="chart-title">
+                                <span>📊 应用实例运行量</span>
+                                <span class="chart-value">{{ instanceRunning }}<span class="u"> / {{ instanceTotal }}</span></span>
+                            </div>
+                            <div class="chart-sub">每 1 分钟统计间隔，总计 1 小时的实例状态历史</div>
+                            <div class="bar-chart-wrap">
+                                <div class="bar-item" v-for="(val, idx) in instanceHistory" :key="idx">
+                                    <div class="bar" :style="{ height: Math.max(val * 10, 4) + '%', background: 'linear-gradient(180deg, #a78bfa, #8b5cf6)' }"></div>
+                                    <div class="bar-label">{{ instanceLabels[idx] }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 面板端内存使用率 -->
+                        <div class="chart-box">
+                            <div class="chart-title">
+                                <span>📊 面板端内存使用率</span>
+                                <span class="chart-value">{{ Math.round(sysInfo.memPercent) }}<span class="u">%</span></span>
+                            </div>
+                            <div class="chart-sub">每 10 秒统计间隔，总计 10 分钟的内存历史使用率</div>
+                            <div class="bar-chart-wrap">
+                                <div class="bar-item" v-for="(val, idx) in memHistory" :key="idx">
+                                    <div class="bar" :style="{ height: Math.max(val, 4) + '%', background: 'linear-gradient(180deg, #3fb950, #58a6ff)' }"></div>
+                                    <div class="bar-label">{{ memLabels[idx] }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ===== 其他页面占位 ===== -->
+                <div v-if="currentDashboardPage === 'servers'" class="placeholder-page">
+                    <span class="big-icon">🖥️</span>
+                    <h2>应用实例</h2>
+                    <p>管理所有 Minecraft 服务器实例</p>
+                    <span class="coming-soon">🚧 开发中</span>
+                </div>
+                <div v-if="currentDashboardPage === 'users'" class="placeholder-page">
+                    <span class="big-icon">👥</span>
+                    <h2>用户管理</h2>
+                    <p>管理面板用户和权限</p>
+                    <span class="coming-soon">🚧 开发中</span>
+                </div>
+                <div v-if="currentDashboardPage === 'settings'" class="placeholder-page">
+                    <span class="big-icon">⚙️</span>
+                    <h2>系统设置</h2>
+                    <p>面板系统配置和优化</p>
+                    <span class="coming-soon">🚧 开发中</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Vue 逻辑 -->
+    <!-- ============================================================ -->
+    <script>
+        (function() {
+            'use strict';
+
+            const STORAGE_KEY = 'panel_user';
+
+            function isInstalled() {
+                return !!localStorage.getItem(STORAGE_KEY);
+            }
+
+            function isValidInput(str) {
+                return /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]+$/.test(str);
+            }
+
+            function randomBetween(min, max) {
+                return Math.round(min + Math.random() * (max - min));
+            }
+
+            new Vue({
+                el: '#app',
+
+                data: {
+                    currentPage: 'install',
+                    isLoggedIn: false,
+
+                    username: '',
+                    password: '',
+                    loggingIn: false,
+                    showLoginPassword: false,
+
+                    regUsername: '',
+                    regPassword: '',
+                    creating: false,
+                    showRegPassword: false,
+
+                    currentUser: '',
+
+                    toast: {
+                        show: false,
+                        type: 'error',
+                        emoji: '😅',
+                        message: '',
+                    },
+                    _toastTimer: null,
+
+                    currentDashboardPage: 'monitor',
+
+                    sysInfo: {
+                        os: 'Windows_NT',
+                        osVersion: '10.0.20348',
+                        hostname: 'DESKTOP',
+                        currentUser: 'Administrator',
+                        uptime: '0时 0分',
+                        cpuUsage: 0,
+                        cpuCores: 8,
+                        memTotal: 16.0,
+                        memUsed: 0,
+                        memPercent: 0,
+                        diskTotal: 256,
+                        diskUsed: 128,
+                        diskPercent: 50,
+                        netSent: '0 MB',
+                        netRecv: '0 MB',
+                        processCount: 0,
+                        lastUpdate: '-'
+                    },
+
+                    nodes: [],
+
+                    requestHistory: [],
+                    cpuHistory: [],
+                    instanceHistory: [],
+                    memHistory: [],
+                    requestLabels: ['59分前', '53分前', '47分前', '41分前', '35分前', '29分前', '23分前', '17分前', '11分前', '5分前',
+                        '现在'
+                    ],
+                    cpuLabels: ['590s', '520s', '450s', '380s', '310s', '240s', '170s', '100s', '30s', '现在'],
+                    instanceLabels: ['59分前', '53分前', '47分前', '41分前', '35分前', '29分前', '23分前', '17分前', '11分前', '5分前',
+                        '现在'
+                    ],
+                    memLabels: ['590s', '520s', '450s', '380s', '310s', '240s', '170s', '100s', '30s', '现在'],
+
+                    requestTotal: 0,
+                    instanceRunning: 0,
+                    instanceTotal: 8,
+
+                    hotReloadConnected: false,
+                    hotReloadStatus: '⏳ 连接中...',
+                    _ws: null,
+                    _sysInterval: null,
+                    currentTime: '',
+                    _timeTimer: null,
+                },
+
+                computed: {
+                    isUsernameValid() {
+                        return this.regUsername.length >= 2 && isValidInput(this.regUsername);
+                    },
+                    isPasswordValid() {
+                        return this.regPassword.length >= 6 && isValidInput(this.regPassword);
+                    },
+                    dashboardTitle() {
+                        const titles = {
+                            'monitor': '📊 数据监控',
+                            'servers': '🖥️ 应用实例',
+                            'users': '👥 用户管理',
+                            'settings': '⚙️ 系统设置'
+                        };
+                        return titles[this.currentDashboardPage] || '管理面板';
+                    },
+                    dashboardSubtitle() {
+                        const subs = {
+                            'monitor': '系统信息总览 · 实时监控',
+                            'servers': '管理所有应用实例',
+                            'users': '管理用户和权限',
+                            'settings': '系统配置和优化'
+                        };
+                        return subs[this.currentDashboardPage] || '';
+                    },
+                    onlineNodes() {
+                        return this.nodes.filter(n => n.status === 'online').length;
+                    },
+                    totalNodes() {
+                        return this.nodes.length;
+                    },
+                    runningInstances() {
+                        let total = 0;
+                        this.nodes.forEach(n => { total += n.running || 0; });
+                        return total;
+                    },
+                    totalInstances() {
+                        let total = 0;
+                        this.nodes.forEach(n => { total += n.total || 0; });
+                        return total;
+                    }
+                },
+
+                methods: {
+                    toggleLoginPassword() { this.showLoginPassword = !this.showLoginPassword; },
+                    toggleRegPassword() { this.showRegPassword = !this.showRegPassword; },
+
+                    updateTime() {
+                        const now = new Date();
+                        this.currentTime = now.getFullYear() + '/' +
+                            String(now.getMonth() + 1).padStart(2, '0') + '/' +
+                            String(now.getDate()).padStart(2, '0') + ' ' +
+                            String(now.getHours()).padStart(2, '0') + ':' +
+                            String(now.getMinutes()).padStart(2, '0') + ':' +
+                            String(now.getSeconds()).padStart(2, '0');
+                    },
+
+                    switchPage(page) {
+                        this.currentDashboardPage = page;
+                    },
+
+                    navigateTo(page) {
+                        this.currentPage = page;
+                        if (page === 'install' || page === 'install-step2') {
+                            window.location.hash = '#/install';
+                        } else {
+                            const hashMap = { 'login': '#/login', 'dashboard': '#/dashboard' };
+                            window.location.hash = hashMap[page] || '#/install';
+                        }
+                        window.scrollTo(0, 0);
+                        this.clearToast();
+                    },
+
+                    showToast(emoji, message, type = 'error') {
+                        this.toast.emoji = emoji;
+                        this.toast.message = message;
+                        this.toast.type = type;
+                        this.toast.show = true;
+                        clearTimeout(this._toastTimer);
+                        this._toastTimer = setTimeout(() => { this.toast.show = false; }, 3500);
+                    },
+                    clearToast() {
+                        this.toast.show = false;
+                        clearTimeout(this._toastTimer);
+                    },
+
+                    goToCreateAccount() {
+                        this.navigateTo('install-step2');
+                        this.$nextTick(() => {
+                            const inputs = document.querySelectorAll('.form-group input');
+                            if (inputs.length) inputs[0].focus();
+                        });
+                    },
+
+                    async handleCreateAccount() {
+                        if (this.creating) return;
+                        const u = this.regUsername.trim();
+                        const p = this.regPassword.trim();
+
+                        if (!u || u.length < 2) {
+                            this.showToast('😿', '账号至少需要 2 个字符哟～', 'error');
+                            return;
+                        }
+                        if (!isValidInput(u)) {
+                            this.showToast('😅', '账号只能包含字母、数字和特殊符号！', 'error');
+                            return;
+                        }
+                        if (!p || p.length < 6) {
+                            this.showToast('😿', '密码至少需要 6 位，安全第一！', 'error');
+                            return;
+                        }
+                        if (!isValidInput(p)) {
+                            this.showToast('😅', '密码只能包含字母、数字和特殊符号！', 'error');
+                            return;
+                        }
+
+                        this.creating = true;
+                        try {
+                            const res = await fetch('/api/register', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ username: u, password: p })
+                            });
+                            const data = await res.json();
+
+                            if (data.success) {
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: u }));
+                                this.currentUser = u;
+                                this.showToast('🎉', '账号创建成功！即将跳转登录～', 'success');
+                                setTimeout(() => {
+                                    this.username = u;
+                                    this.password = '';
+                                    this.navigateTo('login');
+                                    this.regUsername = '';
+                                    this.regPassword = '';
+                                    this.showRegPassword = false;
+                                }, 800);
+                            } else {
+                                this.showToast('😅', data.message || '注册失败，请重试', 'error');
+                            }
+                        } catch (e) {
+                            this.showToast('😅', '连接服务器失败: ' + e.message, 'error');
+                        } finally {
+                            this.creating = false;
+                        }
+                    },
+
+                    async handleLogin() {
+                        if (this.loggingIn) return;
+                        const u = this.username.trim();
+                        const p = this.password.trim();
+
+                        if (!u || !p) {
+                            this.showToast('😿', '账号和密码都不能为空哟～', 'error');
+                            return;
+                        }
+
+                        this.loggingIn = true;
+                        try {
+                            const res = await fetch('/api/login', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ username: u, password: p })
+                            });
+                            const data = await res.json();
+
+                            if (data.success) {
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: u }));
+                                this.currentUser = u;
+                                this.isLoggedIn = true;
+                                this.showToast('🎉', '登录成功！欢迎回来～', 'success');
+                                setTimeout(() => {
+                                    this.navigateTo('dashboard');
+                                    this.initHotReload();
+                                    this.refreshAll();
+                                    if (!this._sysInterval) {
+                                        this._sysInterval = setInterval(this.refreshAll, 5000);
+                                    }
+                                }, 500);
+                            } else {
+                                const msgs = [
+                                    { emoji: '😢', msg: data.message || '账号或密码不对耶…' },
+                                    { emoji: '🤔', msg: '嗯…好像输错了什么？再想想～' },
+                                ];
+                                const pick = msgs[Math.floor(Math.random() * msgs.length)];
+                                this.showToast(pick.emoji, pick.msg, 'error');
+                                this.password = '';
+                                this.showLoginPassword = false;
+                            }
+                        } catch (e) {
+                            this.showToast('😅', '连接服务器失败: ' + e.message, 'error');
+                        } finally {
+                            this.loggingIn = false;
+                        }
+                    },
+
+                    handleLogout() {
+                        localStorage.removeItem(STORAGE_KEY);
+                        this.currentUser = '';
+                        this.username = '';
+                        this.password = '';
+                        this.isLoggedIn = false;
+                        this.showLoginPassword = false;
+                        if (this._sysInterval) { clearInterval(this._sysInterval);
+                            this._sysInterval = null; }
+                        if (this._ws) { this._ws.close();
+                            this._ws = null; }
+                        if (this._timeTimer) { clearInterval(this._timeTimer);
+                            this._timeTimer = null; }
+                        this.navigateTo('login');
+                        this.showToast('👋', '已退出，下次见～', 'success');
+                    },
+
+                    initHotReload() {
+                        if (this._ws) { this._ws.close(); }
+                        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+                        ws.onopen = () => {
+                            this.hotReloadConnected = true;
+                            this.hotReloadStatus = '🔥 热重载已连接';
+                        };
+                        ws.onmessage = (event) => {
+                            try {
+                                const data = JSON.parse(event.data);
+                                if (data.command === 'reload') {
+                                    this.hotReloadStatus = '🔄 刷新中...';
+                                    setTimeout(() => location.reload(), 300);
+                                }
+                            } catch (e) {}
+                        };
+                        ws.onclose = () => {
+                            this.hotReloadConnected = false;
+                            this.hotReloadStatus = '❌ 已断开，3秒后重连...';
+                            setTimeout(() => this.initHotReload(), 3000);
+                        };
+                        ws.onerror = () => {
+                            this.hotReloadStatus = '⚠️ 连接错误...';
+                        };
+                        this._ws = ws;
+                    },
+
+                    async refreshSysInfo() {
+                        try {
+                            const res = await fetch('/api/sysinfo');
+                            const data = await res.json();
+                            this.sysInfo = data;
+                        } catch (e) {
+                            console.error('获取系统信息失败:', e);
+                        }
+                    },
+
+                    async fetchNodes() {
+                        try {
+                            const res = await fetch('/api/nodes');
+                            const data = await res.json();
+                            this.nodes = data;
+                        } catch (e) {
+                            console.error('获取节点列表失败:', e);
+                        }
+                    },
+
+                    updateCharts() {
+                        const cpu = Math.min(this.sysInfo.cpuUsage || 0, 100);
+                        const mem = Math.min(this.sysInfo.memPercent || 0, 100);
+                        const req = 20 + Math.random() * 60;
+                        const inst = Math.round(Math.random() * 8);
+
+                        this.requestHistory.push(Math.round(req));
+                        if (this.requestHistory.length > 11) this.requestHistory.shift();
+                        this.requestTotal = this.requestHistory.reduce((a, b) => a + b, 0);
+
+                        this.cpuHistory.push(Math.round(cpu));
+                        if (this.cpuHistory.length > 10) this.cpuHistory.shift();
+
+                        this.instanceHistory.push(inst);
+                        if (this.instanceHistory.length > 11) this.instanceHistory.shift();
+                        this.instanceRunning = this.instanceHistory[this.instanceHistory.length - 1] || 0;
+
+                        this.memHistory.push(Math.round(mem));
+                        if (this.memHistory.length > 10) this.memHistory.shift();
+                    },
+
+                    async refreshAll() {
+                        await this.refreshSysInfo();
+                        await this.fetchNodes();
+                        this.updateCharts();
+                    },
+
+                    handleHashChange() {
+                        const hash = window.location.hash.replace('#', '');
+                        if (this.isLoggedIn) {
+                            if (hash.includes('dashboard')) { this.currentPage = 'dashboard'; } else { this
+                                    .currentPage = 'dashboard'; }
+                            return;
+                        }
+                        let targetPage = 'install';
+                        if (hash.includes('install') || hash === '') {
+                            targetPage = isInstalled() ? 'login' : 'install';
+                            if (this.currentPage === 'install-step2') { targetPage = 'install-step2'; }
+                        } else if (hash.includes('login')) {
+                            targetPage = isInstalled() ? 'login' : 'install';
+                        } else {
+                            targetPage = isInstalled() ? 'login' : 'install';
+                        }
+                        if (!isInstalled() && targetPage !== 'install' && targetPage !== 'install-step2') {
+                            targetPage = 'install';
+                        }
+                        if (isInstalled() && (targetPage === 'install' || targetPage === 'install-step2')) {
+                            targetPage = 'login';
+                        }
+                        this.currentPage = targetPage;
+                    }
+                },
+
+                mounted() {
+                    const loadingPage = document.getElementById('loading-page');
+                    const app = document.getElementById('app');
+
+                    this.updateTime();
+                    this._timeTimer = setInterval(this.updateTime, 1000);
+
+                    // 初始化图表
+                    for (let i = 0; i < 11; i++) {
+                        this.requestHistory.push(randomBetween(10, 70));
+                        this.instanceHistory.push(randomBetween(0, 6));
+                    }
+                    for (let i = 0; i < 10; i++) {
+                        this.cpuHistory.push(randomBetween(10, 40));
+                        this.memHistory.push(randomBetween(20, 50));
+                    }
+                    this.requestTotal = this.requestHistory.reduce((a, b) => a + b, 0);
+                    this.instanceRunning = this.instanceHistory[this.instanceHistory.length - 1] || 0;
+
+                    const stored = localStorage.getItem(STORAGE_KEY);
+                    if (stored) {
+                        try {
+                            const data = JSON.parse(stored);
+                            this.currentUser = data.username || '';
+                            this.username = data.username || '';
+                            this.isLoggedIn = true;
+                            this.currentPage = 'dashboard';
+                            window.location.hash = '#/dashboard';
+                        } catch (e) {
+                            this.isLoggedIn = false;
+                            this.currentPage = isInstalled() ? 'login' : 'install';
+                            window.location.hash = isInstalled() ? '#/login' : '#/install';
+                        }
+                    } else {
+                        this.isLoggedIn = false;
+                        this.currentPage = isInstalled() ? 'login' : 'install';
+                        window.location.hash = isInstalled() ? '#/login' : '#/install';
+                    }
+
+                    setTimeout(() => {
+                        loadingPage.classList.add('hidden');
+                        app.classList.add('visible');
+                    }, 500);
+
+                    window.addEventListener('hashchange', this.handleHashChange);
+
+                    if (this.isLoggedIn) {
+                        this.initHotReload();
+                        this.refreshAll();
+                        this._sysInterval = setInterval(this.refreshAll, 5000);
+                    }
+
+                    this.$nextTick(() => {
+                        const inputs = document.querySelectorAll('.form-group input');
+                        if (inputs.length) inputs[0].focus();
+                    });
+
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') this.clearToast();
+                    });
+                },
+
+                beforeDestroy() {
+                    clearTimeout(this._toastTimer);
+                    if (this._sysInterval) clearInterval(this._sysInterval);
+                    if (this._timeTimer) clearInterval(this._timeTimer);
+                    if (this._ws) this._ws.close();
+                    window.removeEventListener('hashchange', this.handleHashChange);
+                }
+            });
+
+        })();
+    </script>
+
+</body>
+</html>
