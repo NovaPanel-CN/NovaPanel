@@ -1,7 +1,7 @@
 # ✦ NovaPanel
 
 <p align="center">
-  <img src="images/panel.png" alt="NovaPanel image" width="800">
+  <img src="images/panel-2026-06-30.png" alt="NovaPanel image" width="800">
 </p>
 
 > 轻量 · 高效 · 开箱即用的服务器管理面板（预览版）
