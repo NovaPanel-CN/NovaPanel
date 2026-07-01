@@ -4,7 +4,7 @@
   <img src="images/panel-2026-06-30.png" alt="NovaPanel image" width="800">
 </p>
 
-> 轻量 · 高效 · 开箱即用的服务器管理面板（预览版）
+> 轻量 · 高效 · 开箱即用的服务器管理面板（alpha版）
 
 [![Preview](https://img.shields.io/badge/status-preview-orange.svg)]()
 [![Go Version](https://img.shields.io/badge/Go-1.26.4-00ADD8?logo=go)](https://golang.org/)
@@ -24,7 +24,7 @@
 <table>
   <tr>
     <td align="center" style="background-color: #ffebee; color: #c62828; padding: 12px; border-radius: 6px;">
-      <strong>⚠️ 注意：本项目目前为预览版（Preview），仍在积极开发中，部分功能可能不完善，欢迎反馈！</strong>
+      <strong>⚠️ 注意：本项目目前为alpha版，仍在积极开发中，部分功能可能不完善，欢迎提交issue进行反馈！</strong>
     </td>
   </tr>
 </table>
@@ -85,9 +85,9 @@ NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无
 ### 下载与启动
 
 ```bash
-# 克隆项目
+# 用Git克隆项目（需要先Fork这个仓库）
 git clone https://github.com/你的用户名/NovaPanel.git
 cd NovaPanel
 
-# 直接启动（Node.js 已内置）
+# 直接启动（Node.js运行时已内置）
 dev.bat
