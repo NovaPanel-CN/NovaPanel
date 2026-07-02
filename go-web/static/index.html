@@ -1,18 +1,41 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NovaPanel</title>
-    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js">
-    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaPanel - 新一代面板</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- 使用本地 Vue 3 文件，替代 CDN -->
+    <script src="vue.global.js"></script>
+    <!-- 错误捕获与可见性 fallback：即使 Vue 出错也能看到内容 -->
+    <script>
+        window.addEventListener('error', function(e) {
+            console.error('[全局错误]', e.message, e.filename, e.lineno);
+            window.__showFallback();
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('[未处理的 Promise 错误]', e.reason);
+            window.__showFallback();
+        });
+        window.__showFallback = function() {
+            var app = document.getElementById('app');
+            var loader = document.getElementById('loading-page');
+            if (loader) loader.classList.add('hidden');
+            if (app) app.classList.add('visible');
+        };
+        // 3 秒后如果 #app 仍不可见，强制显示（防止 Vue 卡死导致黑屏）
+        setTimeout(function() {
+            var app = document.getElementById('app');
+            if (app && !app.classList.contains('visible')) {
+                console.warn('[Fallback] Vue 未在 3 秒内启动，强制显示内容');
+                window.__showFallback();
+            }
+        }, 3000);
+    </script>
 </head>
 <body>
 
-    <!-- ============================================================ -->
     <!-- 加载页 -->
-    <!-- ============================================================ -->
     <div id="loading-page">
         <div class="loader">
             <div class="circle"></div>
@@ -21,317 +44,256 @@
         <div class="loading-text">NovaPanel 加载中...</div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- Vue 主应用 -->
-    <!-- ============================================================ -->
-    <div id="app">
-
-        <!-- ========================================================== -->
+    <div id="app" :class="{ visible: appVisible }">
+        
         <!-- 安装页 -->
-        <!-- ========================================================== -->
-        <div v-if="currentPage === 'install' && !isLoggedIn" class="install-card">
+        <div v-if="page === 'install'" class="install-card">
             <div class="logo-big">✦ NovaPanel</div>
             <div class="logo-sub">✨ 新一代面板 · 轻量 · 高效</div>
             <div class="divider-line"></div>
-            <span class="welcome-icon">🚀</span>
+            <div class="welcome-icon">🚀</div>
             <div class="welcome-title">欢迎使用 NovaPanel</div>
             <div class="welcome-desc">
-                开源 · 轻量 · 开箱即用<br />
-                支持 <span class="tag">Minecraft</span> 服务器和所有 <span class="tag">控制台程序</span> 的管理面板
+                <span class="tag">开源</span>
+                <span class="tag">轻量</span>
+                <span class="tag">开箱即用</span>  
+                <br>支持 Minecraft 服务器和所有 控制台程序 的管理面板
             </div>
-            <button class="btn-install" @click="goToCreateAccount">✨ 开始使用</button>
+            <button class="btn-install" @click="goTo('create')">✨ 开始使用</button>
             <div class="footer-info">💡 首次使用？创建管理员账号即可开始</div>
         </div>
 
-        <!-- ========================================================== -->
         <!-- 创建账号页 -->
-        <!-- ========================================================== -->
-        <div v-if="currentPage === 'create' && !isLoggedIn" class="create-card">
+        <div v-if="page === 'create'" class="create-card">
             <div class="create-header">
                 <div class="logo">✦ NovaPanel</div>
                 <div class="create-title">创建管理员账号</div>
                 <div class="create-desc">设置你的账号和密码，以后就用它登录啦～</div>
             </div>
             <div class="steps">
-                <span class="dot done">✓</span>
-                <span class="dot active"></span>
+                <div class="dot active"></div>
+                <div class="dot"></div>
             </div>
-            <div v-if="toast.show" class="toast" :class="toast.type">
+            
+            <div v-if="toast.show" class="toast" :class="{ error: toast.type === 'error' }">
                 <span class="toast-emoji">{{ toast.emoji }}</span>
                 <span>{{ toast.message }}</span>
             </div>
+
             <div class="form-group">
-                <label><span class="icon">👤</span> 账号</label>
-                <input type="text" v-model="regUsername" placeholder="字母、数字、特殊符号" @keydown.enter="handleCreateAccount" />
+                <label>👤 账号</label>
+                <input type="text" v-model="regUsername" placeholder="请输入账号名">
                 <div class="input-hint">
-                    <span :class="isUsernameValid ? 'valid' : 'invalid'">
-                        {{ isUsernameValid ? '✅' : '⬜' }} 字母/数字/特殊符号
-                    </span>
+                    <span :class="isUsernameValid ? 'valid' : 'invalid'">{{ isUsernameValid ? '✅' : '⬜' }} 字母/数字/特殊符号</span>
                 </div>
             </div>
             <div class="form-group">
-                <label><span class="icon">🔐</span> 密码</label>
+                <label>🔐 密码</label>
                 <div class="password-wrapper">
-                    <input :type="showRegPassword ? 'text' : 'password'" v-model="regPassword" placeholder="字母、数字、特殊符号，至少 6 位" @keydown.enter="handleCreateAccount" />
-                    <button type="button" class="password-toggle" @click="toggleRegPassword">
+                    <input :type="showRegPassword ? 'text' : 'password'" v-model="regPassword" placeholder="请输入密码">
+                    <button class="password-toggle" @click="showRegPassword = !showRegPassword">
                         {{ showRegPassword ? '🙈' : '👁️' }}
                     </button>
                 </div>
                 <div class="input-hint">
-                    <span :class="isPasswordValid ? 'valid' : 'invalid'">
-                        {{ isPasswordValid ? '✅' : '⬜' }} 字母/数字/特殊符号，≥6位
-                    </span>
+                    <span :class="isPasswordValid ? 'valid' : 'invalid'">{{ isPasswordValid ? '✅' : '⬜' }} 字母/数字/特殊符号，≥6位</span>
                 </div>
             </div>
-            <button class="btn-create" @click="handleCreateAccount" :disabled="creating || !isUsernameValid || !isPasswordValid">
+            <button class="btn-create" @click="createAdmin" :disabled="!isUsernameValid || !isPasswordValid || creating">
                 {{ creating ? '⏳ 创建中…' : '🎯 创建账号' }}
             </button>
-            <div class="login-footer">
-                已有账号？ <a @click="goToLogin">去登录</a>
-            </div>
         </div>
 
-        <!-- ========================================================== -->
         <!-- 登录页 -->
-        <!-- ========================================================== -->
-        <div v-if="currentPage === 'login' && !isLoggedIn" class="login-card">
+        <div v-if="page === 'login'" class="login-card">
             <div class="login-header">
                 <div class="logo">✦ NovaPanel</div>
                 <div class="login-title">欢迎回来 ✨</div>
                 <div class="login-desc">输入你的小秘密，一起玩耍吧～</div>
             </div>
-            <div v-if="toast.show" class="toast" :class="toast.type">
+
+            <div v-if="toast.show" class="toast" :class="{ error: toast.type === 'error' }">
                 <span class="toast-emoji">{{ toast.emoji }}</span>
                 <span>{{ toast.message }}</span>
             </div>
+
             <div class="form-group">
-                <label><span class="icon">👤</span> 账号</label>
-                <input type="text" v-model="username" placeholder="输入你的账号" @keydown.enter="handleLogin" />
+                <label>👤 账号</label>
+                <input type="text" v-model="loginUsername" placeholder="请输入账号名">
             </div>
             <div class="form-group">
-                <label><span class="icon">🔐</span> 密码</label>
+                <label>🔐 密码</label>
                 <div class="password-wrapper">
-                    <input :type="showLoginPassword ? 'text' : 'password'" v-model="password" placeholder="输入你的密码" @keydown.enter="handleLogin" />
-                    <button type="button" class="password-toggle" @click="toggleLoginPassword">
+                    <input :type="showLoginPassword ? 'text' : 'password'" v-model="loginPassword" placeholder="请输入密码" @keyup.enter="login">
+                    <button class="password-toggle" @click="showLoginPassword = !showLoginPassword">
                         {{ showLoginPassword ? '🙈' : '👁️' }}
                     </button>
                 </div>
             </div>
-            <button class="btn-login" @click="handleLogin" :disabled="loggingIn">
+            <button class="btn-login" @click="login" :disabled="!loginUsername || !loginPassword || loggingIn">
                 {{ loggingIn ? '⏳ 登录中…' : '🚀 冲鸭！登录' }}
             </button>
-            <div class="login-footer">
-                还没账号？ <a @click="goToCreateAccount">去创建</a>
-                <span style="color:#484f58; margin:0 8px;">|</span>
-                <span style="color:#484f58;">NovaPanel v1.0</span>
-            </div>
         </div>
 
-        <!-- ========================================================== -->
-        <!-- 管理面板 -->
-        <!-- ========================================================== -->
-        <div v-if="isLoggedIn" class="dashboard-wrapper">
-
-            <!-- 左侧边栏 -->
+        <!-- 管理面板主框架 -->
+        <div v-if="page === 'dashboard'" class="dashboard-wrapper">
+            <!-- 侧边栏 -->
             <div class="sidebar">
                 <div class="sidebar-logo">
                     <div class="logo-text">✦ NovaPanel</div>
                     <div class="logo-sub">新一代面板 · 轻量 · 高效</div>
                 </div>
                 <div class="sidebar-menu">
-
-                    <!-- 基础功能 -->
                     <div class="menu-label">基础功能</div>
-                    <div class="menu-item" :class="{ active: currentDashboardPage === 'monitor' }" @click="switchPage('monitor')">
-                        <span class="icon">📊</span>
-                        <span class="label">数据监控</span>
+                    <div class="menu-item" :class="{ active: currentPage === 'monitor' }" @click="switchPage('monitor')">
+                        <span class="icon">📊</span><span class="label">数据监控</span>
                     </div>
-                    <div class="menu-item" :class="{ active: currentDashboardPage === 'servers' }" @click="switchPage('servers')">
-                        <span class="icon">🖥️</span>
-                        <span class="label">应用实例</span>
+                    <div class="menu-item" :class="{ active: currentPage === 'instances' }" @click="switchPage('instances')">
+                        <span class="icon">🖥️</span><span class="label">应用实例</span>
                     </div>
-
-                    <!-- 快速开始 -->
-                    <div class="menu-item" :class="{ active: currentDashboardPage === 'quickstart' }" @click="switchPage('quickstart')">
-                        <span class="icon">🚀</span>
-                        <span class="label">快速开始</span>
+                    <div class="menu-item" :class="{ active: currentPage === 'quickstart' }" @click="switchPage('quickstart')">
+                        <span class="icon">🚀</span><span class="label">快速开始</span>
                     </div>
 
-                    <!-- 高级功能 -->
                     <div class="menu-label">高级功能</div>
-                    <div class="menu-item" :class="{ active: currentDashboardPage === 'nodes' }" @click="switchPage('nodes')">
-                        <span class="icon">🌐</span>
-                        <span class="label">节点管理</span>
+                    <div class="menu-item" :class="{ active: currentPage === 'nodes' }" @click="switchPage('nodes')">
+                        <span class="icon">🌐</span><span class="label">节点管理</span>
                     </div>
-                    <div class="menu-item" :class="{ active: currentDashboardPage === 'users' }" @click="switchPage('users')">
-                        <span class="icon">👥</span>
-                        <span class="label">用户管理</span>
+                    <div class="menu-item" :class="{ active: currentPage === 'users' }" @click="switchPage('users')">
+                        <span class="icon">👥</span><span class="label">用户管理</span>
                     </div>
 
-                    <!-- 更多 -->
                     <div class="menu-label">更多</div>
-                    <div class="menu-item" :class="{ active: currentDashboardPage === 'settings' }" @click="switchPage('settings')">
-                        <span class="icon">⚙️</span>
-                        <span class="label">设置</span>
+                    <div class="menu-item" :class="{ active: currentPage === 'settings' }" @click="switchPage('settings')">
+                        <span class="icon">⚙️</span><span class="label">设置</span>
                     </div>
-
                 </div>
                 <div class="sidebar-footer">
                     <div class="user-info">
                         <div class="user-avatar">{{ currentUser.charAt(0).toUpperCase() }}</div>
-                        <div style="flex:1; min-width:0;">
+                        <div style="flex:1">
                             <div class="user-name">{{ currentUser }}</div>
                             <div class="user-role">管理员</div>
                         </div>
-                        <button class="logout-btn" @click="handleLogout" title="退出登录">🚪</button>
+                        <button class="logout-btn" @click="logout">🚪</button>
                     </div>
                 </div>
             </div>
 
-            <!-- 主内容 -->
+            <!-- 主内容区 -->
             <div class="main-content">
-
+                <!-- 统一 top-bar：始终可见，不参与切换动画 -->
                 <div class="top-bar">
-                    <div>
-                        <div class="page-title">{{ dashboardTitle }}</div>
-                        <div class="page-subtitle">{{ dashboardSubtitle }}</div>
-                    </div>
-                    <div class="hot-reload-status" :class="hotReloadConnected ? '' : 'disconnected'">
-                        <span class="dot"></span>
-                        {{ hotReloadStatus }}
+                    <div class="page-title-box">
+                        <div class="page-title-info">
+                            <h1 class="page-title"><span class="title-prefix">控制面板 /</span> {{ pageTitle }}</h1>
+                            <div class="page-subtitle">{{ pageSubtitle }}</div>
+                        </div>
+                        <div v-if="currentPage === 'monitor'" class="hot-reload-status" :class="{ disconnected: !hotReloadConnected }">
+                            <span class="dot"></span>
+                            {{ hotReloadStatus }}
+                        </div>
                     </div>
                 </div>
 
-                <!-- ========================================================== -->
-                <!-- 数据监控 -->
-                <!-- ========================================================== -->
-                <div v-if="currentDashboardPage === 'monitor'">
+                <!-- 内容区加载 spinner（不用遮罩，直接在内容区显示） -->
+                <div v-if="pageLoading" class="page-content-loading">
+                    <div class="page-spinner"></div>
+                </div>
 
+                <!-- 数据监控页 -->
+                <div v-if="currentPage === 'monitor' && !pageLoading" class="page-enter">
                     <div class="refresh-bar">
-                        <button class="btn-refresh" @click="refreshAll">🔄 刷新</button>
+                        <button class="btn-refresh" @click="fetchSysInfo">🔄 刷新</button>
                         <span class="refresh-info">最后更新：{{ sysInfo.lastUpdate }}</span>
                     </div>
 
                     <div class="sysinfo-grid">
                         <div class="sysinfo-item">
-                            <span class="label">🖥️ 系统类型</span>
-                            <span class="value">{{ sysInfo.os }} <span class="sub">({{ sysInfo.osVersion }})</span></span>
+                            <div class="label">🖥️ 系统类型</div>
+                            <div class="value">{{ sysInfo.os }} <span class="sub">({{ sysInfo.osVersion }})</span></div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">💻 计算机名称</span>
-                            <span class="value">{{ sysInfo.hostname }}</span>
+                            <div class="label">💻 计算机名称</div>
+                            <div class="value">{{ sysInfo.hostname }}</div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">👤 进程权限用户</span>
-                            <span class="value">{{ sysInfo.currentUser }}</span>
+                            <div class="label">👤 进程权限用户</div>
+                            <div class="value">{{ sysInfo.currentUser }}</div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">📦 面板版本</span>
-                            <span class="value">1.0.0 <span class="sub">(NovaPanel)</span></span>
+                            <div class="label">📦 面板版本</div>
+                            <div class="value">1.0.0 <span class="sub">(NovaPanel)</span></div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">🕐 面板端时间</span>
-                            <span class="value">{{ currentTime }}</span>
+                            <div class="label">🕐 面板端时间</div>
+                            <div class="value">{{ currentTime }}</div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">🧠 内存使用数值</span>
-                            <span class="value">
+                            <div class="label">🧠 内存使用数值</div>
+                            <div class="value">
                                 <span class="highlight-yellow">{{ sysInfo.memUsed.toFixed(1) }}</span>
                                 <span class="sub">/ {{ sysInfo.memTotal.toFixed(1) }} GB</span>
-                            </span>
+                            </div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">🚫 阻挡请求次数</span>
-                            <span class="value">0</span>
+                            <div class="label">🚫 阻挡请求次数</div>
+                            <div class="value">0</div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">🚷 封禁 IP 数</span>
-                            <span class="value">0</span>
+                            <div class="label">🚷 封禁 IP 数</div>
+                            <div class="value">0</div>
                         </div>
                         <div class="sysinfo-item">
-                            <span class="label">⏱️ 系统运行时间</span>
-                            <span class="value">{{ sysInfo.uptime }}</span>
+                            <div class="label">⏱️ 系统运行时间</div>
+                            <div class="value">{{ sysInfo.uptime }}</div>
                         </div>
                     </div>
 
                     <div class="status-grid">
                         <div class="status-card">
                             <div class="status-label">🔗 节点在线状态</div>
-                            <div class="status-value">
-                                <span class="online">{{ onlineNodes }}</span><span class="s-unit">/ {{ totalNodes }}</span>
-                            </div>
+                            <div class="status-value"><span class="online">{{ onlineNodes }}</span>/ {{ totalNodes }}</div>
                             <div class="status-sub">已连接节点数 / 已配置节点数</div>
                         </div>
                         <div class="status-card">
                             <div class="status-label">📦 实例运行状态</div>
-                            <div class="status-value">
-                                <span class="online">{{ runningInstances }}</span><span class="s-unit">/ {{ totalInstances }}</span>
-                            </div>
+                            <div class="status-value">{{ runningInstances }}/ {{ totalInstances }}</div>
                             <div class="status-sub">正在运行数 / 全部实例总数</div>
                         </div>
                         <div class="status-card">
                             <div class="status-label">🔐 用户登录次数</div>
-                            <div class="status-value">
-                                <span class="highlight-yellow">0</span><span class="s-unit"> : 1</span>
-                            </div>
+                            <div class="status-value">0 : 1</div>
                             <div class="status-sub">登录失败次数 · 登录成功次数</div>
                         </div>
                         <div class="status-card">
                             <div class="status-label">📊 操作系统负载</div>
-                            <div class="status-value" style="font-size:16px;">
-                                <span class="highlight-yellow">{{ Math.round(sysInfo.cpuUsage) }}%</span>
-                                <span class="s-unit">CPU</span>
-                                <span style="color:#8b949e; margin:0 4px;">·</span>
-                                <span class="highlight-yellow">{{ Math.round(sysInfo.memPercent) }}%</span>
-                                <span class="s-unit">RAM</span>
-                            </div>
+                            <div class="status-value">{{ Math.round(sysInfo.cpuUsage) }}%<span class="s-unit">CPU</span> · {{ Math.round(sysInfo.memPercent) }}%<span class="s-unit">RAM</span></div>
                             <div class="status-sub">面板所在主机 CPU · RAM 百分比</div>
                             <div class="status-progress">
-                                <div class="fill" :style="{ width: Math.min(sysInfo.cpuUsage, 100) + '%', background: 'linear-gradient(90deg, #f0883e, #f778ba)' }"></div>
-                            </div>
-                            <div class="status-progress" style="margin-top:3px;">
-                                <div class="fill" :style="{ width: Math.min(sysInfo.memPercent, 100) + '%', background: 'linear-gradient(90deg, #58a6ff, #3fb950)' }"></div>
+                                <div class="fill" :style="{ width: sysInfo.cpuUsage + '%', background: '#58a6ff' }"></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 远程节点总览 - MCSM 覆盖式卡片 -->
                     <div class="node-section">
                         <div class="section-header">
                             <div class="section-title">🌐 远程节点总览</div>
                             <div class="section-desc">
-                                确保所有远程节点均在线，离线状态将导致此远程节点以及相关功能不可用，可能会影响使用体验与数据。<br />
-                                面板端 <span class="highlight">1.0.0</span> 必须对应远程节点 <span class="highlight">1.0.0</span> 版本
+                                确保所有远程节点均在线，离线状态将导致此远程节点以及相关功能不可用，可能会影响使用体验与数据。<br>
+                                面板端 1.0.0 必须对应远程节点 1.0.0 版本
                             </div>
                         </div>
                         <div class="node-table-wrap">
                             <table class="node-table">
                                 <thead>
                                     <tr>
-                                        <th>IP 地址</th>
-                                        <th>端口</th>
-                                        <th>备注</th>
-                                        <th>CPU</th>
-                                        <th>内存</th>
-                                        <th>运行实例</th>
-                                        <th>远程节点版本</th>
-                                        <th>连接状态</th>
+                                        <th>IP 地址</th><th>端口</th><th>备注</th><th>CPU</th><th>内存</th><th>运行实例</th><th>远程节点版本</th><th>连接状态</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="node in nodes" :key="node.id">
-                                        <td>{{ node.ip }}</td>
-                                        <td>{{ node.port }}</td>
-                                        <td>{{ node.name }}</td>
-                                        <td>{{ Math.round(node.cpu) }}%</td>
-                                        <td>{{ node.memUsed.toFixed(1) }}GB / {{ node.memTotal.toFixed(1) }}GB</td>
-                                        <td>{{ node.running }}/{{ node.total }}</td>
-                                        <td>{{ node.version }}</td>
-                                        <td>
-                                            <span :class="node.status === 'online' ? 'status-online' : 'status-offline'">
-                                                {{ node.status === 'online' ? '在线' : '离线' }}
-                                            </span>
-                                        </td>
+                                    <tr v-for="node in nodes" :key="node.ip">
+                                        <td>{{ node.ip }}</td><td>{{ node.port }}</td><td>{{ node.name }}</td><td>{{ Math.round(node.cpu) }}%</td><td>{{ node.memUsed.toFixed(1) }}GB / {{ node.memTotal.toFixed(1) }}GB</td><td>{{ node.running }}/{{ node.total }}</td><td>{{ node.version }}</td><td :class="node.status === 'online' ? 'status-online' : 'status-offline'">{{ node.status === 'online' ? '在线' : '离线' }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -342,21 +304,16 @@
                         <div class="chart-box">
                             <div class="chart-title">
                                 <span>📊 面板端接口请求量</span>
-                                <span class="chart-value">{{ requestTotal }}<span class="u"> 次</span></span>
+                                <span class="chart-value">{{ requestTotal }} <span class="u">次</span></span>
                             </div>
                             <div class="chart-sub">每 1 分钟统计间隔，总计 1 小时的请求历史</div>
                             <div class="line-chart-wrap">
                                 <svg class="line-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                    <line x1="0" y1="0" x2="100" y2="0" class="lc-grid" />
-                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid" />
-                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid" />
-                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid" />
-                                    <line x1="0" y1="100" x2="100" y2="100" class="lc-axis" />
-                                    <polyline :points="linePoints(requestHistory, chartMaxRequest)" class="lc-line" style="stroke: #58a6ff" />
-                                    <circle v-for="(val, idx) in requestHistory" :key="idx"
-                                            :cx="lineX(idx, requestHistory.length)"
-                                            :cy="lineY(val, chartMaxRequest)"
-                                            r="1.5" class="lc-dot" style="fill: #3fb950" />
+                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid"></line>
+                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid"></line>
+                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid"></line>
+                                    <path :d="requestPath" class="lc-line" stroke="#58a6ff"></path>
+                                    <circle :cx="requestPoints[requestPoints.length-1].x" :cy="requestPoints[requestPoints.length-1].y" r="1.5" class="lc-dot" fill="#58a6ff"></circle>
                                 </svg>
                             </div>
                             <div class="lc-labels">
@@ -364,6 +321,7 @@
                                 <span>{{ requestLabels[requestLabels.length - 1] }}</span>
                             </div>
                         </div>
+
                         <div class="chart-box">
                             <div class="chart-title">
                                 <span>📊 面板端 CPU 使用率</span>
@@ -372,16 +330,10 @@
                             <div class="chart-sub">每 10 秒统计间隔，总计 10 分钟的 CPU 历史使用率</div>
                             <div class="line-chart-wrap">
                                 <svg class="line-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                    <line x1="0" y1="0" x2="100" y2="0" class="lc-grid" />
-                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid" />
-                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid" />
-                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid" />
-                                    <line x1="0" y1="100" x2="100" y2="100" class="lc-axis" />
-                                    <polyline :points="linePoints(cpuHistory, 100)" class="lc-line" style="stroke: #f0883e" />
-                                    <circle v-for="(val, idx) in cpuHistory" :key="idx"
-                                            :cx="lineX(idx, cpuHistory.length)"
-                                            :cy="lineY(val, 100)"
-                                            r="1.5" class="lc-dot" style="fill: #f778ba" />
+                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid"></line>
+                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid"></line>
+                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid"></line>
+                                    <path :d="cpuPath" class="lc-line" stroke="#3fb950"></path>
                                 </svg>
                             </div>
                             <div class="lc-labels">
@@ -389,24 +341,19 @@
                                 <span>{{ cpuLabels[cpuLabels.length - 1] }}</span>
                             </div>
                         </div>
+
                         <div class="chart-box">
                             <div class="chart-title">
                                 <span>📊 应用实例运行量</span>
-                                <span class="chart-value">{{ instanceRunning }}<span class="u"> / {{ instanceTotal }}</span></span>
+                                <span class="chart-value">{{ instanceRunning }} <span class="u">/ {{ instanceTotal }}</span></span>
                             </div>
                             <div class="chart-sub">每 1 分钟统计间隔，总计 1 小时的实例状态历史</div>
                             <div class="line-chart-wrap">
                                 <svg class="line-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                    <line x1="0" y1="0" x2="100" y2="0" class="lc-grid" />
-                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid" />
-                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid" />
-                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid" />
-                                    <line x1="0" y1="100" x2="100" y2="100" class="lc-axis" />
-                                    <polyline :points="linePoints(instanceHistory, chartMaxInstance)" class="lc-line" style="stroke: #a78bfa" />
-                                    <circle v-for="(val, idx) in instanceHistory" :key="idx"
-                                            :cx="lineX(idx, instanceHistory.length)"
-                                            :cy="lineY(val, chartMaxInstance)"
-                                            r="1.5" class="lc-dot" style="fill: #8b5cf6" />
+                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid"></line>
+                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid"></line>
+                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid"></line>
+                                    <path :d="instancePath" class="lc-line" stroke="#f0883e"></path>
                                 </svg>
                             </div>
                             <div class="lc-labels">
@@ -414,6 +361,7 @@
                                 <span>{{ instanceLabels[instanceLabels.length - 1] }}</span>
                             </div>
                         </div>
+
                         <div class="chart-box">
                             <div class="chart-title">
                                 <span>📊 面板端内存使用率</span>
@@ -422,16 +370,10 @@
                             <div class="chart-sub">每 10 秒统计间隔，总计 10 分钟的内存历史使用率</div>
                             <div class="line-chart-wrap">
                                 <svg class="line-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                    <line x1="0" y1="0" x2="100" y2="0" class="lc-grid" />
-                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid" />
-                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid" />
-                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid" />
-                                    <line x1="0" y1="100" x2="100" y2="100" class="lc-axis" />
-                                    <polyline :points="linePoints(memHistory, 100)" class="lc-line" style="stroke: #3fb950" />
-                                    <circle v-for="(val, idx) in memHistory" :key="idx"
-                                            :cx="lineX(idx, memHistory.length)"
-                                            :cy="lineY(val, 100)"
-                                            r="1.5" class="lc-dot" style="fill: #58a6ff" />
+                                    <line x1="0" y1="25" x2="100" y2="25" class="lc-grid"></line>
+                                    <line x1="0" y1="50" x2="100" y2="50" class="lc-grid"></line>
+                                    <line x1="0" y1="75" x2="100" y2="75" class="lc-grid"></line>
+                                    <path :d="memPath" class="lc-line" stroke="#f778ba"></path>
                                 </svg>
                             </div>
                             <div class="lc-labels">
@@ -440,138 +382,434 @@
                             </div>
                         </div>
                     </div>
-
                 </div>
 
-                <!-- ========================================================== -->
-                <!-- 快速开始 -->
-                <!-- ========================================================== -->
-                <div v-if="currentDashboardPage === 'quickstart'" class="quickstart-page">
+                <!-- 快速开始页 -->
+                <div v-if="currentPage === 'quickstart' && !pageLoading" class="quickstart-page page-enter">
                     <div class="quickstart-grid">
                         <div class="quickstart-card" @click="switchPage('monitor')">
                             <span class="qs-icon">📊</span>
                             <div class="qs-title">查看数据监控</div>
                             <div class="qs-desc">实时查看系统 CPU、内存、磁盘状态</div>
-                            <div class="qs-btn">去查看 →</div>
+                            <span class="qs-btn">去查看 →</span>
                         </div>
-                        <div class="quickstart-card" @click="switchPage('servers')">
+                        <div class="quickstart-card" @click="switchPage('instances')">
                             <span class="qs-icon">🖥️</span>
                             <div class="qs-title">管理应用实例</div>
                             <div class="qs-desc">启动、停止、管理你的 Minecraft 服务器</div>
-                            <div class="qs-btn">去管理 →</div>
+                            <span class="qs-btn">去管理 →</span>
                         </div>
                         <div class="quickstart-card" @click="switchPage('nodes')">
                             <span class="qs-icon">🌐</span>
                             <div class="qs-title">节点管理</div>
                             <div class="qs-desc">添加、删除、监控远程节点</div>
-                            <div class="qs-btn">去管理 →</div>
+                            <span class="qs-btn">去管理 →</span>
                         </div>
                         <div class="quickstart-card" @click="switchPage('users')">
                             <span class="qs-icon">👥</span>
                             <div class="qs-title">用户管理</div>
                             <div class="qs-desc">添加、删除、管理面板用户</div>
-                            <div class="qs-btn">去管理 →</div>
+                            <span class="qs-btn">去管理 →</span>
                         </div>
                         <div class="quickstart-card" @click="switchPage('settings')">
                             <span class="qs-icon">⚙️</span>
                             <div class="qs-title">设置</div>
                             <div class="qs-desc">配置面板参数和优化选项</div>
-                            <div class="qs-btn">去设置 →</div>
+                            <span class="qs-btn">去设置 →</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- ========================================================== -->
-                <!-- 节点管理 -->
-                <!-- ========================================================== -->
-                <div v-if="currentDashboardPage === 'nodes'" class="nodes-page">
-                    <!-- 添加节点 -->
+                <!-- 节点管理页 -->
+                <div v-if="currentPage === 'nodes' && !pageLoading" class="nodes-page page-enter">
                     <div class="node-add-card">
                         <div class="section-title">➕ 添加远程节点</div>
-                        <div class="section-desc">填写远程节点的 IP、端口和备注名，添加后面板会自动建立 WebSocket 连接。</div>
-                        <div class="node-add-form">
-                            <input class="node-input" v-model.trim="newNodeIP" placeholder="节点 IP，如 127.0.0.1" @keyup.enter="addNode" />
-                            <input class="node-input node-input-port" v-model.trim.number="newNodePort" type="number" placeholder="端口" @keyup.enter="addNode" />
-                            <input class="node-input" v-model.trim="newNodeName" placeholder="备注名（可选）" @keyup.enter="addNode" />
-                            <button class="btn-add" @click="addNode" :disabled="addingNode">
-                                {{ addingNode ? '添加中...' : '添加节点' }}
-                            </button>
+                        <div class="section-desc">点击下方按钮添加一个新的远程节点，支持 NovaPanel 和 MCSManager 节点。</div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button class="btn-add-node-modal" @click="showAddNodeModal = true">➕ 添加节点</button>
+                            <button class="btn-refresh-mini" @click="fetchNodes">🔄 刷新</button>
                         </div>
                     </div>
 
-                    <!-- 节点列表 -->
-                    <div class="node-section">
-                        <div class="section-header">
-                            <div class="section-title">🌐 远程节点列表</div>
-                            <div class="section-desc">
-                                当前共 <span class="highlight">{{ totalNodes }}</span> 个节点，其中
-                                <span class="highlight">{{ onlineNodes }}</span> 个在线。
-                                <button class="btn-refresh-mini" @click="refreshAll" title="刷新数据">🔄 刷新</button>
+                    <div class="node-add-card" style="padding-top: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                            <div>
+                                <div class="section-title">🌐 远程节点列表</div>
+                                <div class="section-desc">
+                                    当前共 {{ totalNodes }} 个节点，其中 <span style="color: #3fb950; font-weight: 600;">{{ onlineNodes }}</span> 个在线。
+                                </div>
                             </div>
                         </div>
-                        <div class="node-table-wrap">
-                            <table class="node-table">
+
+                        <!-- 空状态 -->
+                        <div v-if="nodes.length === 0" class="empty-nodes">
+                            <div style="font-size: 48px; margin-bottom: 12px;">📡</div>
+                            <div>暂无节点，请在上方添加一个远程节点～</div>
+                        </div>
+
+                        <!-- 节点卡片列表 -->
+                        <div v-else class="node-cards-grid">
+                            <div v-for="(node, index) in nodes" :key="index" class="node-card" :class="{ 'node-card-offline': node.status !== 'online' }">
+                                <!-- 卡片头部：IP:端口 + 连接状态 -->
+                                <div class="node-card-header">
+                                    <div class="node-card-ip">{{ node.ip }}:{{ node.port }}</div>
+                                    <div class="node-card-status">
+                                        <span v-if="node.status === 'online'" class="status-dot status-online" title="在线"></span>
+                                        <span v-else-if="node.status === 'connecting'" class="status-dot status-connecting" title="连接中"></span>
+                                        <span v-else class="status-dot status-offline" title="离线"></span>
+                                    </div>
+                                </div>
+
+                                <!-- 备注名 -->
+                                <div v-if="node.name" class="node-card-name">{{ node.name }}</div>
+
+                                <!-- 信息行1：平台 | 内存 | CPU | 实例状态 -->
+                                <div class="node-card-info-row">
+                                    <div class="node-info-item">
+                                        <div class="node-info-label">平台</div>
+                                        <div class="node-info-value">{{ node.platform || (node.type === 'mcsmanager' ? 'MCSManager' : 'NovaPanel') }}</div>
+                                    </div>
+                                    <div class="node-info-item">
+                                        <div class="node-info-label">内存</div>
+                                        <div class="node-info-value">{{ node.memUsed.toFixed(1) }} / {{ node.memTotal.toFixed(1) }}GB <span class="node-info-sub">{{ node.memPercent.toFixed(1) }}%</span></div>
+                                    </div>
+                                    <div class="node-info-item">
+                                        <div class="node-info-label">CPU</div>
+                                        <div class="node-info-value">{{ Math.round(node.cpu) }}%</div>
+                                    </div>
+                                    <div class="node-info-item">
+                                        <div class="node-info-label">实例状态</div>
+                                        <div class="node-info-value">{{ node.running }} / {{ node.total }}</div>
+                                    </div>
+                                </div>
+
+                                <!-- 信息行2：连接状态 | 版本 | Daemon ID -->
+                                <div class="node-card-info-row">
+                                    <div class="node-info-item">
+                                        <div class="node-info-label">连接状态</div>
+                                        <div class="node-info-value">
+                                            <span v-if="node.status === 'online'" style="color: #3fb950;">✅ 在线</span>
+                                            <span v-else-if="node.status === 'connecting'" style="color: #d29922;">🔄 连接中</span>
+                                            <span v-else style="color: #f85149;">❌ 离线</span>
+                                        </div>
+                                    </div>
+                                    <div class="node-info-item">
+                                        <div class="node-info-label">版本</div>
+                                        <div class="node-info-value">{{ node.version || '未知' }}</div>
+                                    </div>
+                                    <div class="node-info-item">
+                                        <div class="node-info-label">Daemon ID</div>
+                                        <div class="node-info-value" style="display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-family: monospace; font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ node.daemonId || node.id }}</span>
+                                            <button v-if="node.daemonId || node.id" class="btn-copy-id" @click="copyToClipboard(node.daemonId || node.id)" title="复制 Daemon ID">📋</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 图表行：CPU 10min | 内存 10min -->
+                                <div class="node-card-charts">
+                                    <div class="node-chart-box">
+                                        <div class="node-chart-title">CPU（10min）{{ Math.round(node.cpu) }}%</div>
+                                        <svg class="node-chart-svg" viewBox="0 0 200 50" preserveAspectRatio="none">
+                                            <defs>
+                                                <linearGradient :id="'cpu-grad-' + index" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.4"/>
+                                                    <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+                                                </linearGradient>
+                                            </defs>
+                                            <g class="grid-lines">
+                                                <line x1="0" y1="12.5" x2="200" y2="12.5" stroke="#21262d" stroke-width="0.5"/>
+                                                <line x1="0" y1="25" x2="200" y2="25" stroke="#21262d" stroke-width="0.5"/>
+                                                <line x1="0" y1="37.5" x2="200" y2="37.5" stroke="#21262d" stroke-width="0.5"/>
+                                            </g>
+                                            <polyline v-if="node.cpuHistory && node.cpuHistory.length > 1"
+                                                :points="buildChartPoints(node.cpuHistory, 200, 50)"
+                                                fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+                                            <polygon v-if="node.cpuHistory && node.cpuHistory.length > 1"
+                                                :points="buildChartPoints(node.cpuHistory, 200, 50) + ',200,50 0,50'"
+                                                :fill="'url(#cpu-grad-' + index + ')'"/>
+                                        </svg>
+                                    </div>
+                                    <div class="node-chart-box">
+                                        <div class="node-chart-title">内存（10min）{{ node.memPercent.toFixed(1) }}%</div>
+                                        <svg class="node-chart-svg" viewBox="0 0 200 50" preserveAspectRatio="none">
+                                            <defs>
+                                                <linearGradient :id="'mem-grad-' + index" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stop-color="#3fb950" stop-opacity="0.4"/>
+                                                    <stop offset="100%" stop-color="#3fb950" stop-opacity="0"/>
+                                                </linearGradient>
+                                            </defs>
+                                            <g class="grid-lines">
+                                                <line x1="0" y1="12.5" x2="200" y2="12.5" stroke="#21262d" stroke-width="0.5"/>
+                                                <line x1="0" y1="25" x2="200" y2="25" stroke="#21262d" stroke-width="0.5"/>
+                                                <line x1="0" y1="37.5" x2="200" y2="37.5" stroke="#21262d" stroke-width="0.5"/>
+                                            </g>
+                                            <polyline v-if="node.memHistory && node.memHistory.length > 1"
+                                                :points="buildChartPoints(node.memHistory, 200, 50)"
+                                                fill="none" stroke="#3fb950" stroke-width="1.5"/>
+                                            <polygon v-if="node.memHistory && node.memHistory.length > 1"
+                                                :points="buildChartPoints(node.memHistory, 200, 50) + ',200,50 0,50'"
+                                                :fill="'url(#mem-grad-' + index + ')'"/>
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <!-- 底部：IP/端口输入框 + 更新/修改密钥/删除按钮 -->
+                                <div class="node-card-footer">
+                                    <label class="node-edit-label">IP</label>
+                                    <input type="text" v-model="node.editIP" :placeholder="node.ip" class="node-edit-input" style="width: 140px;">
+                                    <label class="node-edit-label">端口</label>
+                                    <input type="number" v-model="node.editPort" :placeholder="node.port" class="node-edit-input" style="width: 70px;">
+                                    <button class="btn-update-node" @click="updateNodeAddr(index, node)">更新</button>
+                                    <div class="node-footer-actions">
+                                        <button class="btn-update-node" @click="updateNodeKey(index, node)" title="修改密钥">🔑 修改密钥</button>
+                                        <button class="btn-update-node btn-delete-node" @click="deleteNode(index)" title="删除节点">🗑️ 删除</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 添加节点模态窗口（MCSManager 风格） -->
+                    <div v-if="showAddNodeModal" class="modal-overlay" @click.self="closeAddNodeModal">
+                        <div class="modal-window">
+                            <div class="modal-header">
+                                <div class="modal-title">➕ 添加远程节点</div>
+                                <button class="modal-close" @click="closeAddNodeModal">✕</button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- 选项卡切换 -->
+                                <div class="node-type-tabs">
+                                    <div class="tab" :class="{ active: nodeType === 'novapanel' }" @click="switchNodeType('novapanel')">NovaPanel 远程节点</div>
+                                    <div class="tab" :class="{ active: nodeType === 'mcsmanager' }" @click="switchNodeType('mcsmanager')">MCSManager 远程节点</div>
+                                </div>
+
+                                <!-- NovaPanel 表单 -->
+                                <div v-if="nodeType === 'novapanel'">
+                                    <div class="form-field">
+                                        <label>备注信息</label>
+                                        <div class="field-desc">选填，支持中文，用于填写相关备注信息</div>
+                                        <input type="text" v-model="addNodeForm.remark" placeholder="请输入备注信息">
+                                    </div>
+                                    <div class="form-field">
+                                        <label>远程节点所在主机的 IP 地址 <span class="required">*</span></label>
+                                        <div class="field-desc">必须使用外网地址或 localhost 地址，否则将导致远程实例无法连接</div>
+                                        <input type="text" v-model="addNodeForm.ip" placeholder="例如 zakoxun.top，127.0.0.1">
+                                        <div v-if="addNodeErrors.ip" class="field-error">⚠️ {{ addNodeErrors.ip }}</div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>远程节点端口 <span class="required">*</span></label>
+                                        <div class="field-desc">必填，例如 8078</div>
+                                        <input type="number" v-model="addNodeForm.port" placeholder="例如 8078">
+                                        <div v-if="addNodeErrors.port" class="field-error">⚠️ {{ addNodeErrors.port }}</div>
+                                    </div>
+                                </div>
+
+                                <!-- MCSManager 表单 -->
+                                <div v-if="nodeType === 'mcsmanager'">
+                                    <div class="form-field">
+                                        <label>备注信息</label>
+                                        <div class="field-desc">选填，支持中文，用于填写相关备注信息</div>
+                                        <input type="text" v-model="addNodeForm.remark" placeholder="请输入备注信息">
+                                    </div>
+                                    <div class="form-field">
+                                        <label>远程节点所在主机的 IP 地址 <span class="required">*</span></label>
+                                        <div class="field-desc">必须使用外网地址或 localhost 地址，否则将导致远程实例无法连接</div>
+                                        <input type="text" v-model="addNodeForm.ip" placeholder="例如 mcsmanager.com，43.123.211.12">
+                                        <div v-if="addNodeErrors.ip" class="field-error">⚠️ {{ addNodeErrors.ip }}</div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>远程节点端口 <span class="required">*</span></label>
+                                        <div class="field-desc">必填，例如 24444</div>
+                                        <input type="number" v-model="addNodeForm.port" placeholder="例如 24444">
+                                        <div v-if="addNodeErrors.port" class="field-error">⚠️ {{ addNodeErrors.port }}</div>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>验证密钥 <span class="required">*</span></label>
+                                        <div class="field-desc">在远程节点启动时控制台上会输出显示，务必确保密钥安全</div>
+                                        <div class="field-desc">在 Linux 下，密钥一般在 /opt/mcsmanager/daemon/data/Config/global.json 中</div>
+                                        <div class="field-hint"><a href="#" @click.prevent="showKeyHelp = !showKeyHelp">如何获取密钥？</a></div>
+                                        <div v-if="showKeyHelp" class="field-tip">💡 启动 MCSManager Daemon 后，控制台会输出类似 "key: xxxxxxxx" 的信息，复制该密钥即可。也可在 daemon 的 global.json 文件中找到 key 字段。</div>
+                                        <input type="text" v-model="addNodeForm.apiKey" placeholder="例如 6ff0fa1ef9a943f3c6f2fe0e4564a2fa383d35c4b78ccb5">
+                                        <div v-if="addNodeErrors.apiKey" class="field-error">⚠️ {{ addNodeErrors.apiKey }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="modal-btn modal-btn-cancel" @click="closeAddNodeModal">取消</button>
+                                <button class="modal-btn modal-btn-confirm" @click="confirmAddNode">新增</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 应用实例页 -->
+                <div v-if="currentPage === 'instances' && !pageLoading" class="page-enter">
+                    <div class="placeholder-page">
+                        <span class="big-icon">🖥️</span>
+                        <h2>应用实例</h2>
+                        <p>管理所有 Minecraft 服务器实例</p>
+                        <span class="coming-soon">🚧 开发中</span>
+                    </div>
+                </div>
+
+                <!-- 用户管理页 -->
+                <div v-if="currentPage === 'users' && !pageLoading" class="users-page page-enter">
+                    <div class="user-mgmt-card">
+                        <!-- 顶部工具栏 -->
+                        <div class="user-toolbar">
+                            <div class="user-toolbar-left">
+                                <input v-model="userSearch" type="text" class="user-search-input" placeholder="根据名称搜索" @keyup.enter="userPage = 1" />
+                                <button class="btn-user-op btn-user-search" @click="userPage = 1">🔍 搜索</button>
+                            </div>
+                            <div class="user-toolbar-right">
+                                <button class="btn-user-op btn-user-create" @click="openCreateUserModal">➕ 新建用户</button>
+                                <button class="btn-user-op btn-user-del" @click="confirmDeleteSelected" :disabled="selectedUsers.length === 0">🗑️ 删除用户</button>
+                            </div>
+                        </div>
+
+                        <!-- 用户列表表格 -->
+                        <div class="user-table-wrap">
+                            <table class="user-table">
                                 <thead>
                                     <tr>
-                                        <th>IP 地址</th>
-                                        <th>端口</th>
-                                        <th>备注</th>
-                                        <th>CPU</th>
-                                        <th>内存</th>
-                                        <th>运行实例</th>
-                                        <th>远程节点版本</th>
-                                        <th>连接状态</th>
-                                        <th>操作</th>
+                                        <th class="col-check"><input type="checkbox" :checked="allSelected" @change="toggleSelectAll" /></th>
+                                        <th class="col-uuid">UUID</th>
+                                        <th class="col-name">用户名</th>
+                                        <th class="col-perm">权限等级</th>
+                                        <th class="col-created">注册时间</th>
+                                        <th class="col-login">最后登录</th>
+                                        <th class="col-edit">编辑</th>
+                                        <th class="col-res">分配资源</th>
+                                        <th class="col-op">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-if="nodes.length === 0">
-                                        <td colspan="9" class="empty-row">暂无节点，请在上方添加一个远程节点～</td>
-                                    </tr>
-                                    <tr v-for="node in nodes" :key="node.id">
-                                        <td>{{ node.ip }}</td>
-                                        <td>{{ node.port }}</td>
-                                        <td>{{ node.name }}</td>
-                                        <td>{{ Math.round(node.cpu) }}%</td>
-                                        <td>{{ node.memUsed.toFixed(1) }}GB / {{ node.memTotal.toFixed(1) }}GB</td>
-                                        <td>{{ node.running }}/{{ node.total }}</td>
-                                        <td>{{ node.version }}</td>
-                                        <td>
-                                            <span :class="node.status === 'online' ? 'status-online' : 'status-offline'">
-                                                {{ node.status === 'online' ? '在线' : '离线' }}
-                                            </span>
+                                    <tr v-for="u in pagedUsers" :key="u.uuid" :class="{ 'row-selected': selectedUsers.includes(u.username) }">
+                                        <td class="col-check"><input type="checkbox" :checked="selectedUsers.includes(u.username)" @change="toggleSelectUser(u.username)" /></td>
+                                        <td class="col-uuid" :title="u.uuid">
+                                            <span class="uuid-text">{{ u.uuid.substring(0, 8) }}<span class="uuid-tail">{{ u.uuid.substring(8) }}</span></span>
                                         </td>
-                                        <td class="action-cell">
-                                            <button class="btn-action" title="刷新节点" @click="refreshNode(node.id)">🔄</button>
-                                            <button class="btn-action btn-danger" title="删除节点" @click="deleteNode(node.id)">🗑️</button>
+                                        <td class="col-name">
+                                            <span class="user-avatar">{{ u.username.charAt(0).toUpperCase() }}</span>
+                                            <span class="user-name">{{ u.username }}</span>
+                                        </td>
+                                        <td class="col-perm">
+                                            <span class="perm-badge" :class="'perm-' + u.permission">{{ u.permName }}</span>
+                                        </td>
+                                        <td class="col-created">{{ u.createdAt || '-' }}</td>
+                                        <td class="col-login">{{ u.lastLogin || '从未登录' }}</td>
+                                        <td class="col-edit">
+                                            <button class="btn-action btn-edit" @click="openEditUserModal(u)" title="编辑用户">✏️ 编辑</button>
+                                        </td>
+                                        <td class="col-res">
+                                            <button class="btn-action btn-res" @click="showToast('info', 'ℹ️', '资源分配功能开发中')" title="分配资源">📦 分配资源</button>
+                                        </td>
+                                        <td class="col-op">
+                                            <button class="btn-action btn-danger" @click="deleteSingleUser(u)" :disabled="u.permission === 10" :title="u.permission === 10 ? '管理员不可删除' : '删除用户'">🗑️</button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="filteredUsers.length === 0">
+                                        <td colspan="9" class="empty-row">
+                                            <div class="empty-users">
+                                                <div style="font-size: 40px; margin-bottom: 8px;">👤</div>
+                                                <div>{{ userSearch ? '未找到匹配的用户' : '暂无用户' }}</div>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- 分页 -->
+                        <div class="user-pagination">
+                            <span class="page-info">共 {{ filteredUsers.length }} 个用户</span>
+                            <div class="page-controls">
+                                <button class="page-btn" :disabled="userPage <= 1" @click="userPage--">‹</button>
+                                <span class="page-current">{{ userPage }} / {{ totalUserPages }}</span>
+                                <button class="page-btn" :disabled="userPage >= totalUserPages" @click="userPage++">›</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 新建用户弹窗 -->
+                    <div v-if="showCreateUserModal" class="modal-overlay" @click.self="showCreateUserModal = false">
+                        <div class="modal-box user-modal">
+                            <div class="modal-header">
+                                <h3>➕ 新建用户</h3>
+                                <button class="modal-close" @click="showCreateUserModal = false">×</button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-row">
+                                    <label>用户名</label>
+                                    <input v-model="newUser.username" type="text" placeholder="请输入内容..." />
+                                    <div class="form-hint">必填，6 到 12 个字符，支持中文，英文和字符</div>
+                                </div>
+                                <div class="form-row">
+                                    <label>用户密码</label>
+                                    <input v-model="newUser.password" type="password" placeholder="请输入密码" />
+                                    <div class="form-hint">必填，9 到 36 个字符，必须包含大小写字母和数字</div>
+                                </div>
+                                <div class="form-row">
+                                    <label>权限</label>
+                                    <select v-model="newUser.permission">
+                                        <option :value="1">普通权限</option>
+                                        <option :value="10">最高权限</option>
+                                        <option :value="-1">禁封</option>
+                                    </select>
+                                    <div class="form-hint">普通权限适用于商业用户，最高权限适用于管理人员</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn-user-op btn-cancel" @click="showCreateUserModal = false">取消</button>
+                                <button class="btn-user-op btn-user-create" @click="createUser" :disabled="creatingUser">{{ creatingUser ? '创建中...' : '创建' }}</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 编辑用户弹窗 -->
+                    <div v-if="showEditUserModal" class="modal-overlay" @click.self="showEditUserModal = false">
+                        <div class="modal-box user-modal">
+                            <div class="modal-header">
+                                <h3>✏️ 编辑用户 - {{ editingUser.username }}</h3>
+                                <button class="modal-close" @click="showEditUserModal = false">×</button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="form-row">
+                                    <label>用户名</label>
+                                    <input :value="editingUser.username" type="text" disabled />
+                                </div>
+                                <div class="form-row">
+                                    <label>新密码</label>
+                                    <input v-model="editingUser.password" type="password" placeholder="留空则不修改密码" />
+                                    <div class="form-hint">9 到 36 个字符，必须包含大小写字母和数字</div>
+                                </div>
+                                <div class="form-row">
+                                    <label>权限</label>
+                                    <select v-model="editingUser.permission">
+                                        <option :value="1">普通权限</option>
+                                        <option :value="10">最高权限</option>
+                                        <option :value="-1">禁封</option>
+                                    </select>
+                                    <div class="form-hint">普通权限适用于商业用户，最高权限适用于管理人员</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn-user-op btn-cancel" @click="showEditUserModal = false">取消</button>
+                                <button class="btn-user-op btn-user-create" @click="updateUser" :disabled="updatingUser">{{ updatingUser ? '保存中...' : '保存' }}</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ========================================================== -->
-                <!-- 占位页面 -->
-                <!-- ========================================================== -->
-                <div v-if="currentDashboardPage === 'servers'" class="placeholder-page">
-                    <span class="big-icon">🖥️</span>
-                    <h2>应用实例</h2>
-                    <p>管理所有 Minecraft 服务器实例</p>
-                    <span class="coming-soon">🚧 开发中</span>
-                </div>
-                <div v-if="currentDashboardPage === 'users'" class="placeholder-page">
-                    <span class="big-icon">👥</span>
-                    <h2>用户管理</h2>
-                    <p>管理面板用户和权限</p>
-                    <span class="coming-soon">🚧 开发中</span>
-                </div>
-                <div v-if="currentDashboardPage === 'settings'" class="placeholder-page">
-                    <span class="big-icon">⚙️</span>
-                    <h2>设置</h2>
-                    <p>面板系统配置和优化</p>
-                    <span class="coming-soon">🚧 开发中</span>
+                <!-- 设置页 -->
+                <div v-if="currentPage === 'settings' && !pageLoading" class="page-enter">
+                    <div class="placeholder-page">
+                        <span class="big-icon">⚙️</span>
+                        <h2>设置</h2>
+                        <p>面板系统配置和优化</p>
+                        <span class="coming-soon">🚧 开发中</span>
+                    </div>
                 </div>
 
             </div>
@@ -579,575 +817,628 @@
 
     </div>
 
-    <!-- ============================================================ -->
-    <!-- Vue 逻辑 -->
-    <!-- ============================================================ -->
     <script>
-        (function() {
-            'use strict';
+        const { createApp, ref, computed, onMounted, watch } = Vue;
 
-            const STORAGE_KEY = 'panel_user';
+        const app = createApp({
+            setup() {
+                const appVisible = ref(false);
+                const page = ref('install');
+                const currentPage = ref('monitor');
+                const pageLoading = ref(false);
 
-            function isInstalled() {
-                return !!localStorage.getItem(STORAGE_KEY);
-            }
-
-            function isValidInput(str) {
-                return /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};:'",.<>?/\\|`~]+$/.test(str);
-            }
-
-            function randomBetween(min, max) {
-                return Math.round(min + Math.random() * (max - min));
-            }
-
-            new Vue({
-                el: '#app',
-
-                data: {
-                    currentPage: 'install',
-                    isLoggedIn: false,
-
-                    username: '',
-                    password: '',
-                    loggingIn: false,
-                    showLoginPassword: false,
-
-                    regUsername: '',
-                    regPassword: '',
-                    creating: false,
-                    showRegPassword: false,
-
-                    currentUser: '',
-
-                    toast: {
-                        show: false,
-                        type: 'error',
-                        emoji: '😅',
-                        message: '',
-                    },
-                    _toastTimer: null,
-
-                    currentDashboardPage: 'monitor',
-
-                    sysInfo: {
-                        os: 'Windows_NT',
-                        osVersion: '10.0.20348',
-                        hostname: 'DESKTOP',
-                        currentUser: 'Administrator',
-                        uptime: '0时 0分',
-                        cpuUsage: 0,
-                        cpuCores: 8,
-                        memTotal: 16.0,
-                        memUsed: 0,
-                        memPercent: 0,
-                        diskTotal: 256,
-                        diskUsed: 128,
-                        diskPercent: 50,
-                        netSent: '0 MB',
-                        netRecv: '0 MB',
-                        processCount: 0,
-                        lastUpdate: '-'
-                    },
-
-                    nodes: [],
-
-                    newNodeIP: '',
-                    newNodePort: null,
-                    newNodeName: '',
-                    addingNode: false,
-
-                    requestHistory: [],
-                    cpuHistory: [],
-                    instanceHistory: [],
-                    memHistory: [],
-                    requestLabels: ['59分前', '53分前', '47分前', '41分前', '35分前', '29分前', '23分前', '17分前', '11分前',
-                        '5分前', '现在'
-                    ],
-                    cpuLabels: ['590s', '520s', '450s', '380s', '310s', '240s', '170s', '100s', '30s', '现在'],
-                    instanceLabels: ['59分前', '53分前', '47分前', '41分前', '35分前', '29分前', '23分前', '17分前', '11分前',
-                        '5分前', '现在'
-                    ],
-                    memLabels: ['590s', '520s', '450s', '380s', '310s', '240s', '170s', '100s', '30s', '现在'],
-
-                    requestTotal: 0,
-                    instanceRunning: 0,
-                    instanceTotal: 8,
-
-                    hotReloadConnected: false,
-                    hotReloadStatus: '⏳ 连接中...',
-                    _ws: null,
-                    _sysInterval: null,
-                    currentTime: '',
-                    _timeTimer: null,
-                },
-
-                computed: {
-                    isUsernameValid() {
-                        return this.regUsername.length >= 2 && isValidInput(this.regUsername);
-                    },
-                    isPasswordValid() {
-                        return this.regPassword.length >= 6 && isValidInput(this.regPassword);
-                    },
-                    dashboardTitle() {
-                        const titles = {
-                            'monitor': '📊 数据监控',
-                            'servers': '🖥️ 应用实例',
-                            'nodes': '🌐 节点管理',
-                            'users': '👥 用户管理',
-                            'settings': '⚙️ 设置',
-                            'quickstart': '🚀 快速开始'
-                        };
-                        return titles[this.currentDashboardPage] || '管理面板';
-                    },
-                    dashboardSubtitle() {
-                        const subs = {
-                            'monitor': '系统信息总览 · 实时监控',
-                            'servers': '管理所有应用实例',
-                            'nodes': '添加、删除和监控远程节点',
-                            'users': '管理用户和权限',
-                            'settings': '系统配置和优化',
-                            'quickstart': '快速上手 NovaPanel'
-                        };
-                        return subs[this.currentDashboardPage] || '';
-                    },
-                    onlineNodes() {
-                        return this.nodes.filter(n => n.status === 'online').length;
-                    },
-                    totalNodes() {
-                        return this.nodes.length;
-                    },
-                    runningInstances() {
-                        let total = 0;
-                        this.nodes.forEach(n => { total += n.running || 0; });
-                        return total;
-                    },
-                    totalInstances() {
-                        let total = 0;
-                        this.nodes.forEach(n => { total += n.total || 0; });
-                        return total;
-                    },
-                    chartMaxRequest() {
-                        return Math.max.apply(null, this.requestHistory.concat([1]));
-                    },
-                    chartMaxInstance() {
-                        return Math.max(this.instanceTotal, 1);
-                    }
-                },
-
-                methods: {
-                    toggleLoginPassword() { this.showLoginPassword = !this.showLoginPassword; },
-                    toggleRegPassword() { this.showRegPassword = !this.showRegPassword; },
-
-                    // ===== 折线图辅助方法 =====
-                    // 将数据数组转换为 SVG polyline 的 points 字符串
-                    linePoints(arr, max) {
-                        if (!arr || arr.length === 0 || max <= 0) return '';
-                        var n = arr.length;
-                        var pts = [];
-                        for (var i = 0; i < n; i++) {
-                            var x = n === 1 ? 50 : (i / (n - 1)) * 100;
-                            var y = 95 - (Math.min(arr[i], max) / max) * 90;
-                            pts.push(x.toFixed(2) + ',' + y.toFixed(2));
-                        }
-                        return pts.join(' ');
-                    },
-                    // 计算第 idx 个数据点的 x 坐标
-                    lineX(idx, len) {
-                        if (len <= 1) return 50;
-                        return (idx / (len - 1)) * 100;
-                    },
-                    // 计算某个数据值的 y 坐标
-                    lineY(val, max) {
-                        if (max <= 0) return 95;
-                        return 95 - (Math.min(val, max) / max) * 90;
-                    },
-
-                    updateTime() {
-                        const now = new Date();
-                        this.currentTime = now.getFullYear() + '/' +
-                            String(now.getMonth() + 1).padStart(2, '0') + '/' +
-                            String(now.getDate()).padStart(2, '0') + ' ' +
-                            String(now.getHours()).padStart(2, '0') + ':' +
-                            String(now.getMinutes()).padStart(2, '0') + ':' +
-                            String(now.getSeconds()).padStart(2, '0');
-                    },
-
-                    switchPage(page) {
-                        this.currentDashboardPage = page;
-                    },
-
-                    goToLogin() {
-                        this.currentPage = 'login';
-                        this.clearToast();
-                    },
-
-                    goToCreateAccount() {
-                        this.currentPage = 'create';
-                        this.clearToast();
-                        this.$nextTick(() => {
-                            const inputs = document.querySelectorAll('.form-group input');
-                            if (inputs.length) inputs[0].focus();
-                        });
-                    },
-
-                    showToast(emoji, message, type = 'error') {
-                        this.toast.emoji = emoji;
-                        this.toast.message = message;
-                        this.toast.type = type;
-                        this.toast.show = true;
-                        clearTimeout(this._toastTimer);
-                        this._toastTimer = setTimeout(() => { this.toast.show = false; }, 3500);
-                    },
-                    clearToast() {
-                        this.toast.show = false;
-                        clearTimeout(this._toastTimer);
-                    },
-
-                    async handleCreateAccount() {
-                        if (this.creating) return;
-                        const u = this.regUsername.trim();
-                        const p = this.regPassword.trim();
-
-                        if (!u || u.length < 2) {
-                            this.showToast('😿', '账号至少需要 2 个字符哟～', 'error');
-                            return;
-                        }
-                        if (!isValidInput(u)) {
-                            this.showToast('😅', '账号只能包含字母、数字和特殊符号！', 'error');
-                            return;
-                        }
-                        if (!p || p.length < 6) {
-                            this.showToast('😿', '密码至少需要 6 位，安全第一！', 'error');
-                            return;
-                        }
-                        if (!isValidInput(p)) {
-                            this.showToast('😅', '密码只能包含字母、数字和特殊符号！', 'error');
-                            return;
-                        }
-
-                        this.creating = true;
-                        try {
-                            const res = await fetch('/api/register', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ username: u, password: p })
-                            });
-                            const data = await res.json();
-
-                            if (data.success) {
-                                this.showToast('🎉', '账号创建成功！请登录～', 'success');
-                                setTimeout(() => {
-                                    this.username = u;
-                                    this.password = '';
-                                    this.goToLogin();
-                                    this.regUsername = '';
-                                    this.regPassword = '';
-                                    this.showRegPassword = false;
-                                    this.$nextTick(() => {
-                                        const inputs = document.querySelectorAll('.form-group input');
-                                        if (inputs.length > 1) inputs[1].focus();
-                                    });
-                                }, 800);
-                            } else {
-                                this.showToast('😅', data.message || '注册失败，请重试', 'error');
-                            }
-                        } catch (e) {
-                            this.showToast('😅', '连接服务器失败: ' + e.message, 'error');
-                        } finally {
-                            this.creating = false;
-                        }
-                    },
-
-                    async handleLogin() {
-                        if (this.loggingIn) return;
-                        const u = this.username.trim();
-                        const p = this.password.trim();
-
-                        if (!u || !p) {
-                            this.showToast('😿', '账号和密码都不能为空哟～', 'error');
-                            return;
-                        }
-
-                        this.loggingIn = true;
-                        try {
-                            const res = await fetch('/api/login', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ username: u, password: p })
-                            });
-                            const data = await res.json();
-
-                            if (data.success) {
-                                localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: u }));
-                                this.currentUser = u;
-                                this.isLoggedIn = true;
-                                this.showToast('🎉', '登录成功！欢迎回来～', 'success');
-                                setTimeout(() => {
-                                    this.initHotReload();
-                                    this.refreshAll();
-                                    if (!this._sysInterval) {
-                                        this._sysInterval = setInterval(this.refreshAll, 5000);
-                                    }
-                                }, 500);
-                            } else {
-                                const msgs = [
-                                    { emoji: '😢', msg: data.message || '账号或密码不对耶…' },
-                                    { emoji: '🤔', msg: '嗯…好像输错了什么？再想想～' },
-                                ];
-                                const pick = msgs[Math.floor(Math.random() * msgs.length)];
-                                this.showToast(pick.emoji, pick.msg, 'error');
-                                this.password = '';
-                                this.showLoginPassword = false;
-                            }
-                        } catch (e) {
-                            this.showToast('😅', '连接服务器失败: ' + e.message, 'error');
-                        } finally {
-                            this.loggingIn = false;
-                        }
-                    },
-
-                    handleLogout() {
-                        localStorage.removeItem(STORAGE_KEY);
-                        this.currentUser = '';
-                        this.username = '';
-                        this.password = '';
-                        this.isLoggedIn = false;
-                        this.showLoginPassword = false;
-                        if (this._sysInterval) { clearInterval(this._sysInterval);
-                            this._sysInterval = null; }
-                        if (this._ws) { this._ws.close();
-                            this._ws = null; }
-                        if (this._timeTimer) { clearInterval(this._timeTimer);
-                            this._timeTimer = null; }
-                        this.goToLogin();
-                        this.showToast('👋', '已退出，下次见～', 'success');
-                    },
-
-                    initHotReload() {
-                        if (this._ws) { this._ws.close(); }
-                        const ws = new WebSocket(`ws://${window.location.host}/ws`);
-                        ws.onopen = () => {
-                            this.hotReloadConnected = true;
-                            this.hotReloadStatus = '🔥 热重载已连接';
-                        };
-                        ws.onmessage = (event) => {
-                            try {
-                                const data = JSON.parse(event.data);
-                                if (data.command === 'reload') {
-                                    this.hotReloadStatus = '🔄 刷新中...';
-                                    setTimeout(() => location.reload(), 300);
-                                }
-                            } catch (e) {}
-                        };
-                        ws.onclose = () => {
-                            this.hotReloadConnected = false;
-                            this.hotReloadStatus = '❌ 已断开，3秒后重连...';
-                            setTimeout(() => this.initHotReload(), 3000);
-                        };
-                        ws.onerror = () => {
-                            this.hotReloadStatus = '⚠️ 连接错误...';
-                        };
-                        this._ws = ws;
-                    },
-
-                    async refreshSysInfo() {
-                        try {
-                            const res = await fetch('/api/sysinfo');
-                            const data = await res.json();
-                            this.sysInfo = data;
-                        } catch (e) {
-                            console.error('获取系统信息失败:', e);
-                        }
-                    },
-
-                    async fetchNodes() {
-                        try {
-                            const res = await fetch('/api/nodes');
-                            const data = await res.json();
-                            this.nodes = data;
-                        } catch (e) {
-                            console.error('获取节点列表失败:', e);
-                        }
-                    },
-
-                    async addNode() {
-                        if (this.addingNode) return;
-                        const ip = (this.newNodeIP || '').trim();
-                        const port = this.newNodePort;
-                        const name = (this.newNodeName || '').trim();
-
-                        if (!ip) {
-                            this.showToast('😅', '请填写节点 IP 地址', 'error');
-                            return;
-                        }
-                        if (!port || port <= 0 || port > 65535) {
-                            this.showToast('😅', '请填写有效的端口号（1-65535）', 'error');
-                            return;
-                        }
-
-                        this.addingNode = true;
-                        try {
-                            const res = await fetch('/api/node/add', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ ip, port, name })
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                                this.showToast('🎉', '节点添加成功，正在连接...', 'success');
-                                this.newNodeIP = '';
-                                this.newNodePort = null;
-                                this.newNodeName = '';
-                                await this.fetchNodes();
-                            } else {
-                                this.showToast('😅', data.message || '添加节点失败', 'error');
-                            }
-                        } catch (e) {
-                            this.showToast('😅', '连接服务器失败: ' + e.message, 'error');
-                        } finally {
-                            this.addingNode = false;
-                        }
-                    },
-
-                    async deleteNode(id) {
-                        if (!confirm('确定要删除这个节点吗？')) return;
-                        try {
-                            const res = await fetch('/api/node/delete', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id })
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                                this.showToast('👋', '节点已删除', 'success');
-                                await this.fetchNodes();
-                            } else {
-                                this.showToast('😅', data.message || '删除失败', 'error');
-                            }
-                        } catch (e) {
-                            this.showToast('😅', '连接服务器失败: ' + e.message, 'error');
-                        }
-                    },
-
-                    async refreshNode(id) {
-                        try {
-                            const res = await fetch('/api/node/refresh', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id })
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                                this.showToast('🔄', '节点刷新中...', 'success');
-                                setTimeout(() => this.fetchNodes(), 3000);
-                            } else {
-                                this.showToast('😅', data.message || '刷新失败', 'error');
-                            }
-                        } catch (e) {
-                            this.showToast('😅', '连接服务器失败: ' + e.message, 'error');
-                        }
-                    },
-
-                    updateCharts() {
-                        const cpu = Math.min(this.sysInfo.cpuUsage || 0, 100);
-                        const mem = Math.min(this.sysInfo.memPercent || 0, 100);
-                        const req = 20 + Math.random() * 60;
-                        const inst = Math.round(Math.random() * 8);
-
-                        this.requestHistory.push(Math.round(req));
-                        if (this.requestHistory.length > 11) this.requestHistory.shift();
-                        this.requestTotal = this.requestHistory.reduce((a, b) => a + b, 0);
-
-                        this.cpuHistory.push(Math.round(cpu));
-                        if (this.cpuHistory.length > 10) this.cpuHistory.shift();
-
-                        this.instanceHistory.push(inst);
-                        if (this.instanceHistory.length > 11) this.instanceHistory.shift();
-                        this.instanceRunning = this.instanceHistory[this.instanceHistory.length - 1] || 0;
-
-                        this.memHistory.push(Math.round(mem));
-                        if (this.memHistory.length > 10) this.memHistory.shift();
-                    },
-
-                    async refreshAll() {
-                        await this.refreshSysInfo();
-                        await this.fetchNodes();
-                        this.updateCharts();
-                    }
-                },
-
-                mounted() {
-                    const loadingPage = document.getElementById('loading-page');
-                    const app = document.getElementById('app');
-
-                    this.updateTime();
-                    this._timeTimer = setInterval(this.updateTime, 1000);
-
-                    for (let i = 0; i < 11; i++) {
-                        this.requestHistory.push(randomBetween(10, 70));
-                        this.instanceHistory.push(randomBetween(0, 6));
-                    }
-                    for (let i = 0; i < 10; i++) {
-                        this.cpuHistory.push(randomBetween(10, 40));
-                        this.memHistory.push(randomBetween(20, 50));
-                    }
-                    this.requestTotal = this.requestHistory.reduce((a, b) => a + b, 0);
-                    this.instanceRunning = this.instanceHistory[this.instanceHistory.length - 1] || 0;
-
-                    const stored = localStorage.getItem(STORAGE_KEY);
-                    if (stored) {
-                        try {
-                            const data = JSON.parse(stored);
-                            this.currentUser = data.username || '';
-                            this.username = data.username || '';
-                            this.isLoggedIn = false;
-                            this.currentPage = 'login';
-                            window.location.hash = '#/login';
-                        } catch (e) {
-                            this.isLoggedIn = false;
-                            this.currentPage = 'install';
-                            window.location.hash = '#/install';
-                        }
-                    } else {
-                        this.isLoggedIn = false;
-                        this.currentPage = 'install';
-                        window.location.hash = '#/install';
-                    }
-
+                // 切换页面：显示 0.3s 圆圈加载动画后切换
+                const switchPage = (target) => {
+                    if (currentPage.value === target || pageLoading.value) return;
+                    pageLoading.value = true;
                     setTimeout(() => {
-                        loadingPage.classList.add('hidden');
-                        app.classList.add('visible');
-                    }, 500);
+                        currentPage.value = target;
+                        pageLoading.value = false;
+                    }, 300);
+                };
 
-                    window.addEventListener('hashchange', this.handleHashChange);
+                // 页面标题映射（top-bar 始终可见，不参与动画）
+                const pageMeta = {
+                    monitor: { title: '数据监控', subtitle: '实时查看系统资源、节点和实例运行状态' },
+                    instances: { title: '应用实例', subtitle: '管理所有 Minecraft 服务器实例' },
+                    quickstart: { title: '快速开始', subtitle: '快速了解面板功能与使用指南' },
+                    nodes: { title: '节点管理', subtitle: '添加、删除、监控远程节点连接状态' },
+                    users: { title: '用户管理', subtitle: '管理面板用户和权限' },
+                    settings: { title: '设置', subtitle: '面板系统配置和优化' }
+                };
+                const pageTitle = computed(() => (pageMeta[currentPage.value] || pageMeta.monitor).title);
+                const pageSubtitle = computed(() => (pageMeta[currentPage.value] || pageMeta.monitor).subtitle);
 
-                    if (this.isLoggedIn) {
-                        this.initHotReload();
-                        this.refreshAll();
-                        this._sysInterval = setInterval(this.refreshAll, 5000);
+                const currentUser = ref('Admin');
+                
+                // Toast
+                const toast = ref({ show: false, type: 'success', emoji: '✅', message: '成功' });
+                const showToast = (type, emoji, message) => {
+                    toast.value = { show: true, type, emoji, message };
+                    setTimeout(() => { toast.value.show = false; }, 3000);
+                };
+
+                const goTo = (target) => { page.value = target; };
+
+                // Create Admin
+                const regUsername = ref('');
+                const regPassword = ref('');
+                const showRegPassword = ref(false);
+                const creating = ref(false);
+                const isUsernameValid = computed(() => /^[a-zA-Z0-9_]{3,}$/.test(regUsername.value));
+                const isPasswordValid = computed(() => regPassword.value.length >= 6);
+                const createAdmin = () => {
+                    creating.value = true;
+                    fetch('/api/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: regUsername.value, password: regPassword.value })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        creating.value = false;
+                        if (data.success) {
+                            showToast('success', '🎉', '账号创建成功，请登录！');
+                            page.value = 'login';
+                        } else {
+                            showToast('error', '❌', data.message || '注册失败');
+                        }
+                    })
+                    .catch(() => {
+                        creating.value = false;
+                        showToast('error', '❌', '网络错误，请重试');
+                    });
+                };
+
+                // Login
+                const loginUsername = ref('');
+                const loginPassword = ref('');
+                const showLoginPassword = ref(false);
+                const loggingIn = ref(false);
+                const login = () => {
+                    loggingIn.value = true;
+                    fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: loginUsername.value, password: loginPassword.value })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        loggingIn.value = false;
+                        if (data.success) {
+                            currentUser.value = data.user.username;
+                            page.value = 'dashboard';
+                        } else {
+                            showToast('error', '❌', data.message || '登录失败');
+                        }
+                    })
+                    .catch(() => {
+                        loggingIn.value = false;
+                        showToast('error', '❌', '网络错误，请重试');
+                    });
+                };
+
+                const logout = () => {
+                    fetch('/api/logout').then(() => {
+                        currentUser.value = '';
+                        page.value = 'login';
+                    }).catch(() => {
+                        page.value = 'login';
+                    });
+                };
+
+                // Dashboard Data
+                const hotReloadConnected = ref(true);
+                const hotReloadStatus = ref('热重载已连接');
+                const currentTime = ref('');
+                const sysInfo = ref({
+                    os: '加载中...', osVersion: '', hostname: '加载中...',
+                    currentUser: '加载中...', memUsed: 0, memTotal: 0,
+                    cpuUsage: 0, memPercent: 0, uptime: '加载中...', lastUpdate: '刚刚'
+                });
+
+                const nodes = ref([]);
+                
+                const totalNodes = computed(() => nodes.value.length);
+                const onlineNodes = computed(() => nodes.value.filter(n => n.status === 'online').length);
+                const totalInstances = computed(() => nodes.value.reduce((a, b) => a + b.total, 0));
+                const runningInstances = computed(() => nodes.value.reduce((a, b) => a + b.running, 0));
+
+                const showAddNodeModal = ref(false);
+                const nodeType = ref('novapanel');
+                const showKeyHelp = ref(false);
+                const addNodeForm = ref({ remark: '', ip: '', port: '', apiKey: '' });
+                const addNodeErrors = ref({ ip: '', port: '', apiKey: '' });
+
+                const resetAddNodeForm = () => {
+                    addNodeForm.value = { remark: '', ip: '', port: '', apiKey: '' };
+                    addNodeErrors.value = { ip: '', port: '', apiKey: '' };
+                    showKeyHelp.value = false;
+                };
+                const switchNodeType = (type) => {
+                    nodeType.value = type;
+                    resetAddNodeForm();
+                };
+                const closeAddNodeModal = () => {
+                    showAddNodeModal.value = false;
+                    resetAddNodeForm();
+                };
+                const confirmAddNode = async () => {
+                    addNodeErrors.value = { ip: '', port: '', apiKey: '' };
+                    let hasError = false;
+                    if (!addNodeForm.value.ip || !addNodeForm.value.ip.trim()) {
+                        addNodeErrors.value.ip = 'IP 地址不能为空';
+                        hasError = true;
                     }
+                    if (!addNodeForm.value.port) {
+                        addNodeErrors.value.port = '端口不能为空';
+                        hasError = true;
+                    } else if (addNodeForm.value.port < 1 || addNodeForm.value.port > 65535) {
+                        addNodeErrors.value.port = '端口范围 1-65535';
+                        hasError = true;
+                    }
+                    if (nodeType.value === 'mcsmanager') {
+                        if (!addNodeForm.value.apiKey || !addNodeForm.value.apiKey.trim()) {
+                            addNodeErrors.value.apiKey = '验证密钥不能为空';
+                            hasError = true;
+                        }
+                    }
+                    if (hasError) return;
+                    // 调用后端 API 添加节点
+                    try {
+                        const res = await fetch('/api/node/add', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ip: addNodeForm.value.ip.trim(),
+                                port: parseInt(addNodeForm.value.port),
+                                name: addNodeForm.value.remark.trim() || addNodeForm.value.ip.trim(),
+                                type: nodeType.value,
+                                apiKey: nodeType.value === 'mcsmanager' ? addNodeForm.value.apiKey.trim() : ''
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            // 刷新节点列表
+                            await fetchNodes();
+                            closeAddNodeModal();
+                            showToast('success', '🎉', data.message || '节点添加成功！');
+                        } else {
+                            showToast('error', '⚠️', data.message || '添加失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '⚠️', '网络错误: ' + e.message);
+                    }
+                };
+                const deleteNode = async (index) => {
+                    const node = nodes.value[index];
+                    if (!node || !node.id) {
+                        nodes.value.splice(index, 1);
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/node/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: node.id })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            nodes.value.splice(index, 1);
+                            showToast('success', '🗑️', '节点已删除');
+                        } else {
+                            showToast('error', '⚠️', data.message || '删除失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '⚠️', '网络错误: ' + e.message);
+                    }
+                };
 
-                    this.$nextTick(() => {
-                        const inputs = document.querySelectorAll('.form-group input');
-                        if (inputs.length) inputs[0].focus();
+                // 构建折线图 SVG points 属性
+                const buildChartPoints = (history, width, height) => {
+                    if (!history || history.length < 2) return '';
+                    const max = 100; // CPU/内存百分比最大100
+                    const step = width / (history.length - 1);
+                    return history.map((val, i) => {
+                        const x = i * step;
+                        const y = height - (Math.min(val, max) / max) * height;
+                        return x.toFixed(1) + ',' + y.toFixed(1);
+                    }).join(' ');
+                };
+
+                // 复制到剪贴板
+                const copyToClipboard = (text) => {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast('success', '📋', '已复制: ' + text);
+                    }).catch(() => {
+                        showToast('error', '⚠️', '复制失败');
                     });
+                };
 
-                    document.addEventListener('keydown', (e) => {
-                        if (e.key === 'Escape') this.clearToast();
-                    });
-                },
+                // 更新节点地址
+                const updateNodeAddr = async (index, node) => {
+                    const newIP = node.editIP || node.ip;
+                    const newPort = parseInt(node.editPort) || node.port;
+                    if (!newIP || newPort < 1 || newPort > 65535) {
+                        showToast('error', '⚠️', 'IP 或端口无效');
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/node/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: node.id, ip: newIP, port: newPort })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            node.ip = newIP;
+                            node.port = newPort;
+                            showToast('success', '✅', '节点地址已更新，正在重新连接...');
+                            fetchNodes();
+                        } else {
+                            showToast('error', '⚠️', data.message || '更新失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '⚠️', '网络错误: ' + e.message);
+                    }
+                };
+                const fetchNodes = async () => {
+                    try {
+                        const res = await fetch('/api/nodes');
+                        const data = await res.json();
+                        if (Array.isArray(data)) {
+                            // 初始化 editIP/editPort 为当前值，让输入框直接显示 IP 和端口（可复制可编辑）
+                            data.forEach(n => {
+                                n.editIP = n.ip;
+                                n.editPort = n.port;
+                            });
+                            nodes.value = data;
+                        }
+                    } catch (e) {
+                        console.error('获取节点列表失败:', e);
+                    }
+                };
 
-                beforeDestroy() {
-                    clearTimeout(this._toastTimer);
-                    if (this._sysInterval) clearInterval(this._sysInterval);
-                    if (this._timeTimer) clearInterval(this._timeTimer);
-                    if (this._ws) this._ws.close();
-                    window.removeEventListener('hashchange', this.handleHashChange);
-                }
-            });
+                // 修改节点密钥
+                const updateNodeKey = async (index, node) => {
+                    const newKey = prompt('请输入新的密钥（API Key）：', node.apiKey || '');
+                    if (newKey === null) return; // 用户取消
+                    if (!newKey.trim()) {
+                        showToast('error', '⚠️', '密钥不能为空'); return;
+                    }
+                    try {
+                        const res = await fetch('/api/node/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: node.id, apiKey: newKey.trim() })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('success', '✅', '密钥已更新，正在重新连接...');
+                            fetchNodes();
+                        } else {
+                            showToast('error', '⚠️', data.message || '更新失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '⚠️', '网络错误: ' + e.message);
+                    }
+                };
 
-        })();
+                // Charts
+                const genRandomData = (n, min, max) => Array.from({length: n}, () => Math.random() * (max - min) + min);
+                const genPath = (data) => {
+                    if(data.length === 0) return "M0,50";
+                    let path = `M0,${100 - data[0]}`;
+                    for(let i=1; i<data.length; i++) {
+                        path += ` L${i * (100/(data.length-1))},${100 - data[i]}`;
+                    }
+                    return path;
+                };
+
+                const requestPoints = ref(genRandomData(10, 20, 80).map((y, x) => ({x: x*10, y: 100-y})));
+                const requestPath = computed(() => genPath(requestPoints.value.map(p => 100-p.y)));
+                const requestTotal = computed(() => requestPoints.value.reduce((a, b) => a + Math.round(100 - b.y), 0));
+                const requestLabels = ref(['10:00', '11:00']);
+
+                const cpuData = ref(genRandomData(20, 10, 60));
+                const cpuPath = computed(() => genPath(cpuData.value));
+                const cpuLabels = ref(['10:00', '10:10']);
+
+                const instanceRunning = ref(4);
+                const instanceTotal = ref(8);
+                const instanceData = ref(genRandomData(10, 40, 60));
+                const instancePath = computed(() => genPath(instanceData.value));
+                const instanceLabels = ref(['10:00', '11:00']);
+
+                const memData = ref(genRandomData(20, 30, 50));
+                const memPath = computed(() => genPath(memData.value));
+                const memLabels = ref(['10:00', '10:10']);
+
+                const fetchSysInfo = async () => {
+                    try {
+                        const res = await fetch('/api/sysinfo');
+                        const data = await res.json();
+                        Object.assign(sysInfo.value, data);
+                        sysInfo.value.lastUpdate = new Date().toLocaleString();
+                    } catch (e) {
+                        console.error('获取系统信息失败:', e);
+                        sysInfo.value.lastUpdate = '获取失败';
+                    }
+                };
+
+                onMounted(() => {
+                    // 检查 cookie session，自动登录
+                    fetch('/api/check-session')
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                currentUser.value = data.user.username;
+                                page.value = 'dashboard';
+                                // 登录后加载数据
+                                fetchSysInfo();
+                                fetchNodes();
+                            } else {
+                                // 未登录：根据是否已有用户决定显示安装引导还是登录页
+                                return fetch('/api/install-status')
+                                    .then(r => r.json())
+                                    .then(d => {
+                                        if (d.success && d.hasAdmin) {
+                                            page.value = 'login';
+                                        } else {
+                                            page.value = 'install';
+                                        }
+                                    })
+                                    .catch(() => { page.value = 'install'; });
+                            }
+                        })
+                        .catch(() => { page.value = 'install'; })
+                        .finally(() => {
+                            setTimeout(() => {
+                                document.getElementById('loading-page').classList.add('hidden');
+                                appVisible.value = true;
+                            }, 800);
+                        });
+
+                    setInterval(() => {
+                        currentTime.value = new Date().toLocaleString();
+                    }, 1000);
+                    // 每 5 秒刷新系统信息
+                    setInterval(() => {
+                        if (page.value === 'dashboard') {
+                            fetchSysInfo();
+                        }
+                    }, 5000);
+                    // 每 10 秒刷新节点状态
+                    setInterval(() => {
+                        if (page.value === 'dashboard') {
+                            fetchNodes();
+                        }
+                    }, 10000);
+                });
+
+                // ===== 用户管理 =====
+                const users = ref([]);
+                const userSearch = ref('');
+                const userPage = ref(1);
+                const userPageSize = 10;
+                const selectedUsers = ref([]);
+                const showCreateUserModal = ref(false);
+                const newUser = ref({ username: '', password: '', permission: 1 });
+                const creatingUser = ref(false);
+                const showEditUserModal = ref(false);
+                const editingUser = ref({ username: '', password: '', permission: 1 });
+                const updatingUser = ref(false);
+
+                const filteredUsers = computed(() => {
+                    const kw = userSearch.value.trim().toLowerCase();
+                    if (!kw) return users.value;
+                    return users.value.filter(u => u.username.toLowerCase().includes(kw));
+                });
+                const totalUserPages = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / userPageSize)));
+                const pagedUsers = computed(() => {
+                    const start = (userPage.value - 1) * userPageSize;
+                    return filteredUsers.value.slice(start, start + userPageSize);
+                });
+                const allSelected = computed(() => {
+                    if (pagedUsers.value.length === 0) return false;
+                    return pagedUsers.value.every(u => selectedUsers.value.includes(u.username));
+                });
+
+                const fetchUsers = async () => {
+                    try {
+                        const res = await fetch('/api/user/list');
+                        const data = await res.json();
+                        if (data.success) {
+                            users.value = data.data || [];
+                            if (userPage.value > totalUserPages.value) {
+                                userPage.value = 1;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('获取用户列表失败:', e);
+                    }
+                };
+
+                const openCreateUserModal = () => {
+                    newUser.value = { username: '', password: '', permission: 1 };
+                    showCreateUserModal.value = true;
+                };
+
+                const createUser = async () => {
+                    const uname = newUser.value.username.trim();
+                    const pwd = newUser.value.password;
+                    if (!uname || !pwd) {
+                        showToast('error', '⚠️', '用户名和密码不能为空'); return;
+                    }
+                    if (uname.length < 6 || uname.length > 12) {
+                        showToast('error', '⚠️', '用户名必须 6 到 12 个字符'); return;
+                    }
+                    if (pwd.length < 9 || pwd.length > 36) {
+                        showToast('error', '⚠️', '密码必须 9 到 36 个字符'); return;
+                    }
+                    if (!/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/[0-9]/.test(pwd)) {
+                        showToast('error', '⚠️', '密码必须同时包含大小写字母和数字'); return;
+                    }
+                    creatingUser.value = true;
+                    try {
+                        const res = await fetch('/api/user/create', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(newUser.value)
+                        });
+                        const data = await res.json();
+                        creatingUser.value = false;
+                        if (data.success) {
+                            showToast('success', '✅', '用户创建成功');
+                            showCreateUserModal.value = false;
+                            fetchUsers();
+                        } else {
+                            showToast('error', '❌', data.message || '创建失败');
+                        }
+                    } catch (e) {
+                        creatingUser.value = false;
+                        showToast('error', '❌', '网络错误');
+                    }
+                };
+
+                const openEditUserModal = (u) => {
+                    editingUser.value = { username: u.username, password: '', permission: u.permission };
+                    showEditUserModal.value = true;
+                };
+
+                const updateUser = async () => {
+                    if (editingUser.value.password) {
+                        const pwd = editingUser.value.password;
+                        if (pwd.length < 9 || pwd.length > 36) {
+                            showToast('error', '⚠️', '密码必须 9 到 36 个字符'); return;
+                        }
+                        if (!/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/[0-9]/.test(pwd)) {
+                            showToast('error', '⚠️', '密码必须同时包含大小写字母和数字'); return;
+                        }
+                    }
+                    updatingUser.value = true;
+                    try {
+                        const body = {
+                            username: editingUser.value.username,
+                            permission: parseInt(editingUser.value.permission),
+                            updatePerm: true
+                        };
+                        if (editingUser.value.password) {
+                            body.password = editingUser.value.password;
+                            body.updatePass = true;
+                        }
+                        const res = await fetch('/api/user/update', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        const data = await res.json();
+                        updatingUser.value = false;
+                        if (data.success) {
+                            showToast('success', '✅', '用户已更新');
+                            showEditUserModal.value = false;
+                            fetchUsers();
+                        } else {
+                            showToast('error', '❌', data.message || '更新失败');
+                        }
+                    } catch (e) {
+                        updatingUser.value = false;
+                        showToast('error', '❌', '网络错误');
+                    }
+                };
+
+                const deleteSingleUser = async (u) => {
+                    if (u.permission === 10) {
+                        showToast('error', '⚠️', '管理员不可删除'); return;
+                    }
+                    if (!confirm(`确定删除用户 "${u.username}" 吗？`)) return;
+                    try {
+                        const res = await fetch('/api/user/delete', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: u.username })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('success', '✅', '用户已删除');
+                            fetchUsers();
+                        } else {
+                            showToast('error', '❌', data.message || '删除失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '❌', '网络错误');
+                    }
+                };
+
+                const confirmDeleteSelected = async () => {
+                    if (selectedUsers.value.length === 0) return;
+                    if (!confirm(`确定删除选中的 ${selectedUsers.value.length} 个用户吗？`)) return;
+                    for (const name of [...selectedUsers.value]) {
+                        try {
+                            await fetch('/api/user/delete', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ username: name })
+                            });
+                        } catch (e) {}
+                    }
+                    showToast('success', '✅', '批量删除完成');
+                    selectedUsers.value = [];
+                    fetchUsers();
+                };
+
+                const toggleSelectAll = (e) => {
+                    if (e.target.checked) {
+                        selectedUsers.value = pagedUsers.value.map(u => u.username);
+                    } else {
+                        selectedUsers.value = [];
+                    }
+                };
+
+                const toggleSelectUser = (name) => {
+                    const idx = selectedUsers.value.indexOf(name);
+                    if (idx >= 0) {
+                        selectedUsers.value.splice(idx, 1);
+                    } else {
+                        selectedUsers.value.push(name);
+                    }
+                };
+
+                // 切换到用户管理页时自动加载用户列表
+                watch(currentPage, (val) => {
+                    if (val === 'users') {
+                        fetchUsers();
+                    }
+                });
+
+                return {
+                    appVisible, page, currentPage, pageLoading, switchPage, pageTitle, pageSubtitle, goTo,
+                    toast,
+                    regUsername, regPassword, showRegPassword, creating, isUsernameValid, isPasswordValid, createAdmin,
+                    loginUsername, loginPassword, showLoginPassword, loggingIn, login,
+                    currentUser, logout,
+                    hotReloadConnected, hotReloadStatus, currentTime, sysInfo, fetchSysInfo,
+                    nodes, totalNodes, onlineNodes, totalInstances, runningInstances,
+                    showAddNodeModal, nodeType, addNodeForm, addNodeErrors, showKeyHelp,
+                    switchNodeType, closeAddNodeModal, confirmAddNode, deleteNode, fetchNodes,
+                    buildChartPoints, copyToClipboard, updateNodeAddr, updateNodeKey,
+                    requestPoints, requestPath, requestTotal, requestLabels,
+                    cpuPath, cpuLabels,
+                    instanceRunning, instanceTotal, instancePath, instanceLabels,
+                    memPath, memLabels,
+                    users, userSearch, userPage, userPageSize, selectedUsers,
+                    showCreateUserModal, newUser, creatingUser,
+                    showEditUserModal, editingUser, updatingUser,
+                    filteredUsers, totalUserPages, pagedUsers, allSelected,
+                    fetchUsers, openCreateUserModal, createUser,
+                    openEditUserModal, updateUser,
+                    deleteSingleUser, confirmDeleteSelected,
+                    toggleSelectAll, toggleSelectUser
+                };
+            }
+        });
+        app.config.errorHandler = function(err, instance, info) {
+            console.error('[Vue 渲染错误]', err, '\n信息:', info);
+            window.__showFallback();
+        };
+        app.mount('#app');
+        console.log('[NovaPanel] Vue 已挂载');
     </script>
-
 </body>
 </html>
