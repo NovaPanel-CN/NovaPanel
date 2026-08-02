@@ -105,6 +105,7 @@ run.bat
 # linux克隆项目（需要先Fork本仓库）
 cd /opt
 git clone https://github.com/你的用户名/NovaPanel.git
+cd NovaPanel
 
 # linux正常使用请直接启动（会自动安装和设置开机自启）
 run.sh
