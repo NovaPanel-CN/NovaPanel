@@ -77,6 +77,7 @@ NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无
 | 前端 | Go | 现代化管理界面 |
 | Web 后端 | Go | 高性能 Web 服务 |
 | 远程节点 | Go | 分布式节点管理 |
+| 文件管理 | Go | 实时双向通信 |
 | API 服务 | Node.js + Express | 数据接口 |
 | 通信协议 | WebSocket | 实时双向通信 |
 
@@ -99,13 +100,37 @@ NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无
 git clone https://github.com/你的用户名/NovaPanel.git
 cd NovaPanel
 
+# 或者直接打开该链接下载即可
+点我下载→ https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+# 若无法直接下载/下载速度慢，请打开选择任意ghproxy链接下载（在未开启VPN的情况下）
+cloudflare v4 优选加速下载ghoroxy: https://gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+cloudflare v4 备用优选加速下载ghproxy: https://v4.gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+cloudflare v4/v6 优选加速下载ghoroxy: https://v6.gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+Fastly v4 加速下载ghproxy: https://cdn.gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
 # windows正常使用请直接启动（Node.js 已内置）
 run.bat
 
 # linux克隆项目（需要先Fork本仓库）
 cd /opt
 git clone https://github.com/你的用户名/NovaPanel.git
-cd NovaPanel
+
+# 或者直接打开该链接下载即可
+点我下载→ https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+# 若无法直接下载/下载速度慢，请打开选择任意ghproxy链接下载（在未开启VPN的情况下）
+cloudflare v4 优选加速下载ghoroxy: https://gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+cloudflare v4 备用优选加速下载ghproxy: https://v4.gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+cloudflare v4/v6 优选加速下载ghoroxy: https://v6.gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
+
+Fastly v4 加速下载ghproxy: https://cdn.gh-proxy.org/https://github.com/NovaPanel-CN/NovaPanel/archive/refs/heads/main.zip
 
 # linux正常使用请直接启动（会自动安装和设置开机自启）
+cd /opt/NovaPanel
 run.sh
