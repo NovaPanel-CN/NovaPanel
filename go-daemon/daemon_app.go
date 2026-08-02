@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -23,7 +26,7 @@ const (
 
 var (
 	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin:     func(r *http.Request) bool { return true },
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
@@ -206,10 +209,420 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			instancesMu.RUnlock()
 			conn.WriteJSON(WSMessage{Type: "instances_list", Data: list, Success: true})
 
+		case "file_list", "file_download", "file_upload", "file_delete",
+			"file_rename", "file_mkdir", "file_touch", "file_read", "file_write":
+			handleFileOperation(conn, &msg)
+
 		default:
 			log.Printf("⚠️ 未知消息类型: %s", msg.Type)
 		}
 	}
+}
+
+// ========== 文件管理 ==========
+
+// 文件操作最大大小限制（50MB）
+const fileMaxSize = 50 * 1024 * 1024
+
+// FileInfo 文件信息
+type FileInfo struct {
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Size    int64  `json:"size"`
+	IsDir   bool   `json:"isDir"`
+	ModTime string `json:"modTime"`
+	Mode    string `json:"mode"`
+}
+
+// FileRequest 文件操作请求
+type FileRequest struct {
+	Path    string `json:"path"`
+	OldPath string `json:"oldPath"`
+	NewPath string `json:"newPath"`
+	Content string `json:"content"`
+}
+
+// resolvePath 安全地解析路径，返回绝对路径
+// 兼容 Linux（/）和 Windows（C:\）路径格式
+func resolvePath(p string) (string, error) {
+	if p == "" {
+		p = "/"
+	}
+	// 统一路径分隔符后清理
+	cleaned := filepath.Clean(p)
+	if cleaned == "." {
+		cleaned = "/"
+	}
+	// 转为绝对路径
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("路径解析失败: %v", err)
+	}
+	return abs, nil
+}
+
+// handleFileOperation 统一处理文件操作请求
+func handleFileOperation(conn *websocket.Conn, msg *WSMessage) {
+	// 解析请求数据
+	dataBytes, err := json.Marshal(msg.Data)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: msg.Type, Success: false, Message: "参数解析失败"})
+		return
+	}
+	var req FileRequest
+	if err := json.Unmarshal(dataBytes, &req); err != nil {
+		conn.WriteJSON(WSMessage{Type: msg.Type, Success: false, Message: "参数解析失败"})
+		return
+	}
+
+	switch msg.Type {
+	case "file_list":
+		handleFileList(conn, &req)
+	case "file_download":
+		handleFileDownload(conn, &req)
+	case "file_upload":
+		handleFileUpload(conn, &req)
+	case "file_delete":
+		handleFileDelete(conn, &req)
+	case "file_rename":
+		handleFileRename(conn, &req)
+	case "file_mkdir":
+		handleFileMkdir(conn, &req)
+	case "file_touch":
+		handleFileTouch(conn, &req)
+	case "file_read":
+		handleFileRead(conn, &req)
+	case "file_write":
+		handleFileWrite(conn, &req)
+	}
+}
+
+// handleFileList 列出目录内容
+func handleFileList(conn *websocket.Conn, req *FileRequest) {
+	// Windows 上根目录枚举所有盘符
+	if runtime.GOOS == "windows" && (req.Path == "" || req.Path == "/" || req.Path == "\\") {
+		drives := listWindowsDrives()
+		conn.WriteJSON(WSMessage{
+			Type:    "file_list",
+			Success: true,
+			Data: map[string]interface{}{
+				"path":  "/",
+				"files": drives,
+			},
+		})
+		return
+	}
+
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_list", Success: false, Message: err.Error()})
+		return
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_list", Success: false, Message: "路径不存在或无法访问: " + err.Error()})
+		return
+	}
+
+	// 如果是文件，返回其所在目录
+	if !info.IsDir() {
+		absPath = filepath.Dir(absPath)
+	}
+
+	entries, err := os.ReadDir(absPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_list", Success: false, Message: "读取目录失败: " + err.Error()})
+		return
+	}
+
+	files := make([]FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		files = append(files, FileInfo{
+			Name:    entry.Name(),
+			Path:    filepath.Join(absPath, entry.Name()),
+			Size:    info.Size(),
+			IsDir:   entry.IsDir(),
+			ModTime: info.ModTime().Format("2006-01-02 15:04:05"),
+			Mode:    info.Mode().String(),
+		})
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_list",
+		Success: true,
+		Data: map[string]interface{}{
+			"path":  absPath,
+			"files": files,
+		},
+	})
+}
+
+// listWindowsDrives 枚举 Windows 所有可用盘符（C/D/E...）
+func listWindowsDrives() []FileInfo {
+	var drives []FileInfo
+	for c := 'C'; c <= 'Z'; c++ {
+		drive := string(c) + ":\\"
+		if _, err := os.Stat(drive); err == nil {
+			drives = append(drives, FileInfo{
+				Name:    string(c) + ":",
+				Path:    string(c) + ":/",
+				Size:    0,
+				IsDir:   true,
+				ModTime: "",
+				Mode:    "drwxr-xr-x",
+			})
+		}
+	}
+	return drives
+}
+
+// handleFileDownload 下载文件（base64 编码）
+func handleFileDownload(conn *websocket.Conn, req *FileRequest) {
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_download", Success: false, Message: err.Error()})
+		return
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_download", Success: false, Message: "文件不存在: " + err.Error()})
+		return
+	}
+	if info.IsDir() {
+		conn.WriteJSON(WSMessage{Type: "file_download", Success: false, Message: "不能下载文件夹"})
+		return
+	}
+	if info.Size() > fileMaxSize {
+		conn.WriteJSON(WSMessage{Type: "file_download", Success: false, Message: "文件过大（超过 50MB 限制）"})
+		return
+	}
+
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_download", Success: false, Message: "读取文件失败: " + err.Error()})
+		return
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_download",
+		Success: true,
+		Data: map[string]interface{}{
+			"name":    filepath.Base(absPath),
+			"path":    absPath,
+			"size":    info.Size(),
+			"content": base64.StdEncoding.EncodeToString(data),
+		},
+	})
+}
+
+// handleFileUpload 上传文件（base64 编码）
+func handleFileUpload(conn *websocket.Conn, req *FileRequest) {
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_upload", Success: false, Message: err.Error()})
+		return
+	}
+
+	data, err := base64.StdEncoding.DecodeString(req.Content)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_upload", Success: false, Message: "文件内容解码失败: " + err.Error()})
+		return
+	}
+	if int64(len(data)) > fileMaxSize {
+		conn.WriteJSON(WSMessage{Type: "file_upload", Success: false, Message: "文件过大（超过 50MB 限制）"})
+		return
+	}
+
+	// 确保父目录存在
+	os.MkdirAll(filepath.Dir(absPath), 0755)
+
+	if err := os.WriteFile(absPath, data, 0644); err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_upload", Success: false, Message: "写入文件失败: " + err.Error()})
+		return
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_upload",
+		Success: true,
+		Data:    map[string]interface{}{"path": absPath, "size": len(data)},
+	})
+}
+
+// handleFileDelete 删除文件或目录
+func handleFileDelete(conn *websocket.Conn, req *FileRequest) {
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_delete", Success: false, Message: err.Error()})
+		return
+	}
+
+	// 防止删除根目录
+	if absPath == "/" || absPath == filepath.Dir(absPath) {
+		conn.WriteJSON(WSMessage{Type: "file_delete", Success: false, Message: "不能删除根目录"})
+		return
+	}
+
+	if err := os.RemoveAll(absPath); err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_delete", Success: false, Message: "删除失败: " + err.Error()})
+		return
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_delete",
+		Success: true,
+		Data:    map[string]interface{}{"path": absPath},
+	})
+}
+
+// handleFileRename 重命名或移动文件/目录
+func handleFileRename(conn *websocket.Conn, req *FileRequest) {
+	oldPath, err := resolvePath(req.OldPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_rename", Success: false, Message: err.Error()})
+		return
+	}
+	newPath, err := resolvePath(req.NewPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_rename", Success: false, Message: err.Error()})
+		return
+	}
+
+	if _, err := os.Stat(oldPath); err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_rename", Success: false, Message: "源路径不存在: " + err.Error()})
+		return
+	}
+
+	os.MkdirAll(filepath.Dir(newPath), 0755)
+	if err := os.Rename(oldPath, newPath); err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_rename", Success: false, Message: "重命名失败: " + err.Error()})
+		return
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_rename",
+		Success: true,
+		Data:    map[string]interface{}{"oldPath": oldPath, "newPath": newPath},
+	})
+}
+
+// handleFileMkdir 新建文件夹
+func handleFileMkdir(conn *websocket.Conn, req *FileRequest) {
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_mkdir", Success: false, Message: err.Error()})
+		return
+	}
+
+	if err := os.MkdirAll(absPath, 0755); err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_mkdir", Success: false, Message: "创建文件夹失败: " + err.Error()})
+		return
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_mkdir",
+		Success: true,
+		Data:    map[string]interface{}{"path": absPath},
+	})
+}
+
+// handleFileTouch 新建空文件
+func handleFileTouch(conn *websocket.Conn, req *FileRequest) {
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_touch", Success: false, Message: err.Error()})
+		return
+	}
+
+	if _, err := os.Stat(absPath); err == nil {
+		conn.WriteJSON(WSMessage{Type: "file_touch", Success: false, Message: "文件已存在"})
+		return
+	}
+
+	os.MkdirAll(filepath.Dir(absPath), 0755)
+	f, err := os.Create(absPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_touch", Success: false, Message: "创建文件失败: " + err.Error()})
+		return
+	}
+	f.Close()
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_touch",
+		Success: true,
+		Data:    map[string]interface{}{"path": absPath},
+	})
+}
+
+// handleFileRead 读取文件文本内容（用于在线编辑）
+func handleFileRead(conn *websocket.Conn, req *FileRequest) {
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_read", Success: false, Message: err.Error()})
+		return
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_read", Success: false, Message: "文件不存在: " + err.Error()})
+		return
+	}
+	if info.IsDir() {
+		conn.WriteJSON(WSMessage{Type: "file_read", Success: false, Message: "不能读取文件夹内容"})
+		return
+	}
+	if info.Size() > fileMaxSize {
+		conn.WriteJSON(WSMessage{Type: "file_read", Success: false, Message: "文件过大（超过 50MB 限制）"})
+		return
+	}
+
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_read", Success: false, Message: "读取文件失败: " + err.Error()})
+		return
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_read",
+		Success: true,
+		Data: map[string]interface{}{
+			"name":    filepath.Base(absPath),
+			"path":    absPath,
+			"size":    info.Size(),
+			"content": string(data),
+		},
+	})
+}
+
+// handleFileWrite 写入文件文本内容（用于在线编辑保存）
+func handleFileWrite(conn *websocket.Conn, req *FileRequest) {
+	absPath, err := resolvePath(req.Path)
+	if err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_write", Success: false, Message: err.Error()})
+		return
+	}
+
+	if int64(len(req.Content)) > fileMaxSize {
+		conn.WriteJSON(WSMessage{Type: "file_write", Success: false, Message: "内容过大（超过 50MB 限制）"})
+		return
+	}
+
+	os.MkdirAll(filepath.Dir(absPath), 0755)
+	if err := os.WriteFile(absPath, []byte(req.Content), 0644); err != nil {
+		conn.WriteJSON(WSMessage{Type: "file_write", Success: false, Message: "写入文件失败: " + err.Error()})
+		return
+	}
+
+	conn.WriteJSON(WSMessage{
+		Type:    "file_write",
+		Success: true,
+		Data:    map[string]interface{}{"path": absPath, "size": len(req.Content)},
+	})
 }
 
 func getSystemInfo() SystemInfo {
@@ -256,6 +669,7 @@ func getCPUUsage() float64 {
 // ========== 内存信息 ==========
 // Windows: 使用 PowerShell 获取 Win32_OperatingSystem
 //   - TotalVisibleMemorySize 和 FreePhysicalMemory 均返回 KB
+//
 // Linux:   读取 /proc/meminfo
 func getMemoryInfo() (total, used, percent float64) {
 	log.Printf("📊 正在获取内存信息...")

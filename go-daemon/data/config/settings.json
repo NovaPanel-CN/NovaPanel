@@ -1,0 +1,14 @@
+{
+  "panelName": "NovaPanel",
+  "port": 8080,
+  "sessionTimeout": 10,
+  "debug": false,
+  "hotReload": true,
+  "crossDomain": false,
+  "gzip": true,
+  "pageSize": 10,
+  "maxLoginAttempts": 5,
+  "banDuration": 20,
+  "allowFileManager": true,
+  "loginLimitEnabled": true
+}

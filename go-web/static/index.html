@@ -45,14 +45,16 @@
     </div>
 
     <div id="app" :class="{ visible: appVisible }">
-        
+        <!-- 背景层（全局可见，包含登录页和主界面） -->
+        <div v-if="themeForm.background" class="app-background-layer" :style="{ backgroundImage: 'url(/backgrounds/' + themeForm.background + ')', opacity: themeForm.bgOpacity }"></div>
+
         <!-- 安装页 -->
         <div v-if="page === 'install'" class="install-card">
             <div class="logo-big">✦ NovaPanel</div>
             <div class="logo-sub">✨ 新一代面板 · 轻量 · 高效</div>
             <div class="divider-line"></div>
             <div class="welcome-icon">🚀</div>
-            <div class="welcome-title">欢迎使用 NovaPanel</div>
+            <div class="welcome-title">{{ t('welcome.title') }}</div>
             <div class="welcome-desc">
                 <span class="tag">开源</span>
                 <span class="tag">轻量</span>
@@ -108,8 +110,8 @@
         <div v-if="page === 'login'" class="login-card">
             <div class="login-header">
                 <div class="logo">✦ NovaPanel</div>
-                <div class="login-title">欢迎回来 ✨</div>
-                <div class="login-desc">输入你的小秘密，一起玩耍吧～</div>
+                <div class="login-title">{{ t('login.title') }}</div>
+                <div class="login-desc">{{ t('login.desc') }}</div>
             </div>
 
             <div v-if="toast.show" class="toast" :class="{ error: toast.type === 'error' }">
@@ -117,22 +119,38 @@
                 <span>{{ toast.message }}</span>
             </div>
 
-            <div class="form-group">
-                <label>👤 账号</label>
-                <input type="text" v-model="loginUsername" placeholder="请输入账号名">
-            </div>
-            <div class="form-group">
-                <label>🔐 密码</label>
-                <div class="password-wrapper">
-                    <input :type="showLoginPassword ? 'text' : 'password'" v-model="loginPassword" placeholder="请输入密码" @keyup.enter="login">
-                    <button class="password-toggle" @click="showLoginPassword = !showLoginPassword">
-                        {{ showLoginPassword ? '🙈' : '👁️' }}
+            <template v-if="!show2FA">
+                <div class="form-group">
+                    <label>👤 账号</label>
+                    <input type="text" v-model="loginUsername" placeholder="请输入账号名">
+                </div>
+                <div class="form-group">
+                    <label>🔐 密码</label>
+                    <div class="password-wrapper">
+                        <input :type="showLoginPassword ? 'text' : 'password'" v-model="loginPassword" placeholder="请输入密码" @keyup.enter="login">
+                        <button class="password-toggle" @click="showLoginPassword = !showLoginPassword">
+                            {{ showLoginPassword ? '🙈' : '👁️' }}
+                        </button>
+                    </div>
+                </div>
+                <button class="btn-login" @click="login" :disabled="!loginUsername || !loginPassword || loggingIn">
+                    {{ loggingIn ? t('loggingIn') : t('login.button') }}
+                </button>
+            </template>
+
+            <!-- 2FA 验证区域 -->
+            <div v-if="show2FA" class="twofa-section">
+                <div class="twofa-icon">🔐</div>
+                <div class="twofa-title">两步验证</div>
+                <div class="twofa-desc">请输入身份验证器 App 中的 6 位动态码</div>
+                <input type="text" v-model="twoFACode" class="twofa-input" placeholder="000000" maxlength="6" @keyup.enter="verify2FA">
+                <div class="twofa-actions">
+                    <button class="mcsm-btn" @click="cancel2FA">返回</button>
+                    <button class="mcsm-btn mcsm-btn-primary" @click="verify2FA" :disabled="verifying2FA">
+                        {{ verifying2FA ? '验证中...' : '验证' }}
                     </button>
                 </div>
             </div>
-            <button class="btn-login" @click="login" :disabled="!loginUsername || !loginPassword || loggingIn">
-                {{ loggingIn ? '⏳ 登录中…' : '🚀 冲鸭！登录' }}
-            </button>
         </div>
 
         <!-- 管理面板主框架 -->
@@ -141,32 +159,34 @@
             <div class="sidebar">
                 <div class="sidebar-logo">
                     <div class="logo-text">✦ NovaPanel</div>
-                    <div class="logo-sub">新一代面板 · 轻量 · 高效</div>
+                    <div class="logo-sub">{{ t('app.subtitle') }}</div>
                 </div>
                 <div class="sidebar-menu">
-                    <div class="menu-label">基础功能</div>
+                    <div class="menu-label">{{ t('sidebar.base') }}</div>
                     <div class="menu-item" :class="{ active: currentPage === 'monitor' }" @click="switchPage('monitor')">
-                        <span class="icon">📊</span><span class="label">数据监控</span>
+                        <span class="icon">📊</span><span class="label">{{ t('sidebar.monitor') }}</span>
                     </div>
                     <div class="menu-item" :class="{ active: currentPage === 'instances' }" @click="switchPage('instances')">
-                        <span class="icon">🖥️</span><span class="label">应用实例</span>
+                        <span class="icon">🖥️</span><span class="label">{{ t('sidebar.instances') }}</span>
                     </div>
                     <div class="menu-item" :class="{ active: currentPage === 'quickstart' }" @click="switchPage('quickstart')">
-                        <span class="icon">🚀</span><span class="label">快速开始</span>
+                        <span class="icon">🚀</span><span class="label">{{ t('sidebar.quickstart') }}</span>
                     </div>
 
-                    <div class="menu-label">高级功能</div>
+                    <template v-if="currentUserPermission === 10">
+                    <div class="menu-label">{{ t('sidebar.advanced') }}</div>
                     <div class="menu-item" :class="{ active: currentPage === 'nodes' }" @click="switchPage('nodes')">
-                        <span class="icon">🌐</span><span class="label">节点管理</span>
+                        <span class="icon">🌐</span><span class="label">{{ t('sidebar.nodes') }}</span>
                     </div>
                     <div class="menu-item" :class="{ active: currentPage === 'users' }" @click="switchPage('users')">
-                        <span class="icon">👥</span><span class="label">用户管理</span>
+                        <span class="icon">👥</span><span class="label">{{ t('sidebar.users') }}</span>
                     </div>
 
-                    <div class="menu-label">更多</div>
+                    <div class="menu-label">{{ t('sidebar.more') }}</div>
                     <div class="menu-item" :class="{ active: currentPage === 'settings' }" @click="switchPage('settings')">
-                        <span class="icon">⚙️</span><span class="label">设置</span>
+                        <span class="icon">⚙️</span><span class="label">{{ t('sidebar.settings') }}</span>
                     </div>
+                    </template>
                 </div>
                 <div class="sidebar-footer">
                     <div class="user-info">
@@ -176,7 +196,7 @@
                         </div>
                         <div style="flex:1">
                             <div class="user-name">{{ currentUser }}</div>
-                            <div class="user-role">管理员</div>
+                            <div class="user-role">{{ currentUserPermission === 10 ? '管理员' : '普通用户' }}</div>
                         </div>
                     </div>
                 </div>
@@ -618,6 +638,7 @@
                                     <input type="number" v-model="node.editPort" :placeholder="node.port" class="node-edit-input" style="width: 70px;">
                                     <button class="btn-update-node" @click="updateNodeAddr(index, node)">更新</button>
                                     <div class="node-footer-actions">
+                                        <button class="btn-update-node" @click="openFileManager(node)" title="文件管理" :disabled="node.status !== 'online'">📂 文件管理</button>
                                         <button class="btn-update-node" @click="updateNodeKey(index, node)" title="修改密钥">🔑 修改密钥</button>
                                         <button class="btn-update-node btn-delete-node" @click="deleteNode(index)" title="删除节点">🗑️ 删除</button>
                                     </div>
@@ -705,6 +726,122 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 文件管理模态窗口 -->
+                    <div v-if="showFileManager" class="modal-overlay file-manager-overlay" @click.self="closeFileManager">
+                        <div class="modal-window file-manager-window">
+                            <div class="modal-header">
+                                <div class="modal-title">📂 文件管理 — {{ fileManagerNodeName }}</div>
+                                <button class="modal-close" @click="closeFileManager">✕</button>
+                            </div>
+                            <div class="modal-body file-manager-body">
+                                <!-- 工具栏 -->
+                                <div class="file-toolbar">
+                                    <div class="file-breadcrumb">
+                                        <span v-for="(crumb, ci) in fileBreadcrumbs" :key="ci" class="file-crumb" @click="navigateToBreadcrumb(ci)">
+                                            <span v-if="ci > 0" class="file-crumb-sep">/</span>{{ crumb.name }}
+                                        </span>
+                                    </div>
+                                    <div class="file-actions">
+                                        <button class="file-btn" @click="goUpDir" title="返回上级">⬆️</button>
+                                        <button class="file-btn" @click="refreshFileList" title="刷新">🔄</button>
+                                        <button class="file-btn" @click="showNewFolderDialog" title="新建文件夹">📁＋</button>
+                                        <button class="file-btn" @click="showNewFileDialogFn" title="新建文件">📄＋</button>
+                                        <button class="file-btn file-btn-upload" @click="triggerUpload" title="上传文件">⬆️ 上传</button>
+                                        <input type="file" ref="fileInputRef" style="display:none" @change="handleFileUpload">
+                                    </div>
+                                </div>
+                                <!-- 文件列表 -->
+                                <div class="file-list-container">
+                                    <div v-if="fileLoading" class="file-loading">
+                                        <span class="file-loading-spinner"></span> 加载中...
+                                    </div>
+                                    <div v-else-if="fileList.length === 0" class="file-empty">📭 空文件夹</div>
+                                    <div v-else class="file-list">
+                                        <div class="file-list-header">
+                                            <span class="file-col-icon"></span>
+                                            <span class="file-col-name">名称</span>
+                                            <span class="file-col-size">大小</span>
+                                            <span class="file-col-time">修改时间</span>
+                                            <span class="file-col-ops">操作</span>
+                                        </div>
+                                        <div v-for="file in fileList" :key="file.path"
+                                             class="file-item"
+                                             :class="{ 'file-selected': selectedFile && selectedFile.path === file.path }"
+                                             @click="file.isDir ? openFile(file) : selectFile(file)">
+                                            <span class="file-col-icon">{{ file.isDir ? '📁' : getFileIcon(file.name) }}</span>
+                                            <span class="file-col-name">{{ file.name }}</span>
+                                            <span class="file-col-size">{{ file.isDir ? '-' : formatSize(file.size) }}</span>
+                                            <span class="file-col-time">{{ file.modTime }}</span>
+                                            <span class="file-col-ops">
+                                                <button v-if="!file.isDir && isTextFile(file.name)" class="file-op-btn" @click.stop="editFile(file)" title="编辑">✏️</button>
+                                                <button v-if="!file.isDir" class="file-op-btn" @click.stop="downloadFile(file)" title="下载">⬇️</button>
+                                                <button class="file-op-btn" @click.stop="renameFile(file)" title="重命名">📝</button>
+                                                <button class="file-op-btn file-op-danger" @click.stop="deleteFile(file)" title="删除">🗑️</button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 文件编辑器模态窗口 -->
+                    <div v-if="showFileEditor" class="modal-overlay" @click.self="closeFileEditor">
+                        <div class="modal-window file-editor-window">
+                            <div class="modal-header">
+                                <div class="modal-title">✏️ 编辑：{{ fileEditorName }}</div>
+                                <button class="modal-close" @click="closeFileEditor">✕</button>
+                            </div>
+                            <div class="modal-body file-editor-body">
+                                <textarea v-model="fileEditorContent" class="file-editor-textarea"
+                                    :disabled="fileEditorSaving" spellcheck="false"
+                                    placeholder="文件内容..."></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="modal-btn modal-btn-cancel" @click="closeFileEditor">取消</button>
+                                <button class="modal-btn modal-btn-confirm" @click="saveFileContent" :disabled="fileEditorSaving">
+                                    {{ fileEditorSaving ? '⏳ 保存中...' : '💾 保存' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 新建文件/文件夹对话框 -->
+                    <div v-if="showNewFileDialog" class="modal-overlay" @click.self="showNewFileDialog = false">
+                        <div class="modal-window" style="width:400px;max-width:90%;">
+                            <div class="modal-header">
+                                <div class="modal-title">{{ newFileType === 'folder' ? '📁 新建文件夹' : '📄 新建文件' }}</div>
+                                <button class="modal-close" @click="showNewFileDialog = false">✕</button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="text" v-model="newFileName" placeholder="请输入名称"
+                                    @keyup.enter="confirmNewFile" class="form-input" style="width:100%;">
+                            </div>
+                            <div class="modal-footer">
+                                <button class="modal-btn modal-btn-cancel" @click="showNewFileDialog = false">取消</button>
+                                <button class="modal-btn modal-btn-confirm" @click="confirmNewFile">确认</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 重命名对话框 -->
+                    <div v-if="showRenameDialog" class="modal-overlay" @click.self="showRenameDialog = false">
+                        <div class="modal-window" style="width:400px;max-width:90%;">
+                            <div class="modal-header">
+                                <div class="modal-title">📝 重命名</div>
+                                <button class="modal-close" @click="showRenameDialog = false">✕</button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="text" v-model="renameValue" placeholder="请输入新名称"
+                                    @keyup.enter="confirmRename" class="form-input" style="width:100%;">
+                            </div>
+                            <div class="modal-footer">
+                                <button class="modal-btn modal-btn-cancel" @click="showRenameDialog = false">取消</button>
+                                <button class="modal-btn modal-btn-confirm" @click="confirmRename">确认</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 应用实例页 -->
@@ -723,7 +860,7 @@
                         <!-- 顶部工具栏 -->
                         <div class="user-toolbar">
                             <div class="user-toolbar-left">
-                                <input v-model="userSearch" type="text" class="user-search-input" placeholder="根据名称搜索" @keyup.enter="userPage = 1" />
+                                <input v-model="userSearch" type="text" class="user-search-input" :placeholder="t('users.searchPlaceholder')" @keyup.enter="userPage = 1" />
                                 <button class="btn-user-op btn-user-search" @click="userPage = 1">🔍 搜索</button>
                             </div>
                             <div class="user-toolbar-right">
@@ -742,6 +879,7 @@
                                         <th class="user-th-uuid">UUID</th>
                                         <th class="user-th-time">注册时间</th>
                                         <th class="user-th-time">最后登录</th>
+                                        <th class="user-th-2fa">2FA</th>
                                         <th class="user-th-action">操作</th>
                                     </tr>
                                 </thead>
@@ -762,7 +900,11 @@
                                         </td>
                                         <td class="user-td-uuid"><span class="uuid-text" :title="u.uuid">{{ u.uuid.substring(0, 16) }}...</span></td>
                                         <td class="user-td-time">{{ u.createdAt || '-' }}</td>
-                                        <td class="user-td-time">{{ u.lastLogin || '从未登录' }}</td>
+                                        <td class="user-td-time">{{ u.lastLogin || t('common.never') }}</td>
+                                        <td class="user-td-2fa">
+                                            <span v-if="u.twoFAEnabled" class="twofa-badge twofa-on">{{ t('common.enabled') }}</span>
+                                            <span v-else class="twofa-badge twofa-off">{{ t('common.disabled') }}</span>
+                                        </td>
                                         <td class="user-td-action">
                                             <div class="user-row-actions">
                                                 <button class="btn-action btn-edit" @click="openEditUserModal(u)" title="编辑用户">
@@ -800,7 +942,7 @@
                     <div v-if="showCreateUserModal" class="modal-overlay" @click.self="showCreateUserModal = false">
                         <div class="modal-box user-modal">
                             <div class="modal-header">
-                                <h3>➕ 新建用户</h3>
+                                <h3>{{ t('users.create') }}</h3>
                                 <button class="modal-close" @click="showCreateUserModal = false">×</button>
                             </div>
                             <div class="modal-body">
@@ -867,12 +1009,356 @@
                 </div>
 
                 <!-- 设置页 -->
-                <div v-if="currentPage === 'settings' && !pageLoading" class="page-enter">
-                    <div class="placeholder-page">
-                        <span class="big-icon">⚙️</span>
-                        <h2>设置</h2>
-                        <p>面板系统配置和优化</p>
-                        <span class="coming-soon">🚧 开发中</span>
+                <div v-if="currentPage === 'settings' && !pageLoading" class="page-enter settings-page">
+                    <!-- 设置页操作板块 -->
+                    <div class="settings-action-card">
+                        <div class="settings-action-info">
+                            <div class="settings-action-title">面板配置</div>
+                            <div class="settings-action-desc">修改下方配置后点击「更新配置」使其生效</div>
+                        </div>
+                        <div class="settings-action-buttons">
+                            <button class="settings-action-btn settings-action-primary" @click="saveSettings" :disabled="settingsSaving">
+                                {{ settingsSaving ? '⏳ 更新中...' : '⚡ 更新配置' }}
+                            </button>
+                            <button class="settings-action-btn" @click="refreshSettings" :disabled="settingsSaving">
+                                🔄 刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div class="settings-grid">
+                        <!-- 面板信息卡片（只读） -->
+                        <div class="mcsm-card">
+                            <div class="mcsm-card-title">
+                                <span class="mcsm-title-bar"></span>
+                                面板信息
+                            </div>
+                            <div class="mcsm-card-body">
+                                <table class="mcsm-info-table">
+                                    <tbody>
+                                        <tr>
+                                            <td class="mcsm-info-label">面板版本</td>
+                                            <td class="mcsm-info-value">1.0.0 <span class="settings-ver-tag">NovaPanel</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">安装时间</td>
+                                            <td class="mcsm-info-value">{{ settings.panelCreatedAt || '未知' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">运行时间</td>
+                                            <td class="mcsm-info-value">{{ sysInfo.uptime }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">监听端口</td>
+                                            <td class="mcsm-info-value">{{ settings.port }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">操作系统</td>
+                                            <td class="mcsm-info-value">{{ sysInfo.os }} <span class="mcsm-info-sub">{{ sysInfo.osVersion }}</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">主机名称</td>
+                                            <td class="mcsm-info-value">{{ sysInfo.hostname }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">CPU 核心</td>
+                                            <td class="mcsm-info-value">{{ sysInfo.cpuCores || '-' }} 核</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">内存总量</td>
+                                            <td class="mcsm-info-value">{{ sysInfo.memTotal ? sysInfo.memTotal + ' GB' : '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="mcsm-info-label">DataKey</td>
+                                            <td class="mcsm-info-value mcsm-uuid-cell">
+                                                <span class="mcsm-uuid-text">{{ settings.dataKey ? settings.dataKey.substring(0, 24) + '...' : '未生成' }}</span>
+                                                <button class="mcsm-copy-btn" @click="copyToClipboard(settings.dataKey)" title="复制 DataKey">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                </button>
+                                                <button class="mcsm-btn mcsm-btn-danger mcsm-btn-xs" @click="resetDataKey" title="重置 DataKey">🔄 重置</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 面板配置卡片（可编辑） -->
+                        <div class="mcsm-card">
+                            <div class="mcsm-card-title">
+                                <span class="mcsm-title-bar"></span>
+                                {{ t('settings.panelConfig') }}
+                            </div>
+                            <div class="mcsm-card-body">
+                                <div class="settings-form">
+                                    <div class="mcsm-form-group">
+                                        <label class="mcsm-form-label">{{ t('settings.language') }}</label>
+                                        <select v-model="currentLang" @change="changeLang(currentLang)" class="mcsm-input">
+                                            <option v-for="lang in langList" :key="lang.code" :value="lang.code">{{ lang.name }}</option>
+                                        </select>
+                                        <div class="settings-form-hint">{{ t('settings.languageHint') }}</div>
+                                    </div>
+                                    <div class="mcsm-form-group">
+                                        <label class="mcsm-form-label">{{ t('settings.panelName') }}</label>
+                                        <input type="text" v-model="settingsForm.panelName" class="mcsm-input" :placeholder="t('settings.panelName')">
+                                        <div class="settings-form-hint">{{ t('settings.panelNameHint') }}</div>
+                                    </div>
+                                    <div class="mcsm-form-group">
+                                        <label class="mcsm-form-label">监听端口</label>
+                                        <input type="number" v-model="settingsForm.port" class="mcsm-input" placeholder="例如 8080" min="1" max="65535">
+                                        <div class="settings-form-hint">修改后需要重启面板才能生效哦～</div>
+                                    </div>
+                                    <div class="mcsm-form-group">
+                                        <label class="mcsm-form-label">会话时长（分钟）</label>
+                                        <input type="number" v-model="settingsForm.sessionTimeout" class="mcsm-input" placeholder="例如 10" min="1" max="1440">
+                                        <div class="settings-form-hint">登录后会话保持的时间，超过将自动登出</div>
+                                    </div>
+                                    <div class="settings-switch-row">
+                                        <div class="settings-switch-info">
+                                            <div class="settings-switch-label">调试模式</div>
+                                            <div class="settings-switch-desc">开启后控制台将输出更详细的日志信息</div>
+                                        </div>
+                                        <label class="settings-switch">
+                                            <input type="checkbox" v-model="settingsForm.debug">
+                                            <span class="settings-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="settings-switch-row">
+                                        <div class="settings-switch-info">
+                                            <div class="settings-switch-label">热重载</div>
+                                            <div class="settings-switch-desc">修改前端文件后自动刷新浏览器页面</div>
+                                        </div>
+                                        <label class="settings-switch">
+                                            <input type="checkbox" v-model="settingsForm.hotReload">
+                                            <span class="settings-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="settings-switch-row">
+                                        <div class="settings-switch-info">
+                                            <div class="settings-switch-label">Gzip 压缩</div>
+                                            <div class="settings-switch-desc">对 HTTP 响应启用 Gzip 压缩，减少带宽占用</div>
+                                        </div>
+                                        <label class="settings-switch">
+                                            <input type="checkbox" v-model="settingsForm.gzip">
+                                            <span class="settings-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="mcsm-form-group">
+                                        <label class="mcsm-form-label">前端分页大小</label>
+                                        <input type="number" v-model="settingsForm.pageSize" class="mcsm-input" placeholder="例如 10" min="1" max="100">
+                                        <div class="settings-form-hint">列表页每页默认显示的条数（如用户列表）</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 限制与安全卡片 -->
+                        <div class="mcsm-card">
+                            <div class="mcsm-card-title">
+                                <span class="mcsm-title-bar"></span>
+                                限制与安全
+                            </div>
+                            <div class="mcsm-card-body">
+                                <div class="settings-form">
+                                    <div class="mcsm-form-group">
+                                        <label class="mcsm-form-label">登录失败封禁阈值（次）</label>
+                                        <input type="number" v-model="settingsForm.maxLoginAttempts" class="mcsm-input" placeholder="例如 5" min="1" max="100">
+                                        <div class="settings-form-hint">连续登录失败达到此次数后，IP 将被临时封禁</div>
+                                    </div>
+                                    <div class="mcsm-form-group">
+                                        <label class="mcsm-form-label">IP 封禁时长（分钟）</label>
+                                        <input type="number" v-model="settingsForm.banDuration" class="mcsm-input" placeholder="例如 20" min="1" max="1440">
+                                        <div class="settings-form-hint">被封禁的 IP 在此时间后将自动解封</div>
+                                    </div>
+                                    <div class="settings-switch-row">
+                                        <div class="settings-switch-info">
+                                            <div class="settings-switch-label">{{ t('settings.twofa') }}</div>
+                                            <div class="settings-switch-desc">开启后每次登录需要输入动态验证码</div>
+                                        </div>
+                                        <label class="settings-switch">
+                                            <input type="checkbox" :checked="twoFAEnabled" @change="toggle2FA">
+                                            <span class="settings-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="settings-switch-row">
+                                        <div class="settings-switch-info">
+                                            <div class="settings-switch-label">准许普通用户使用文件管理功能</div>
+                                            <div class="settings-switch-desc">文件管理是一个较为消耗资源且不易控制的功能，如果您的普通用户没有文件管理的任何需求，可以禁止用户使用文件管理。</div>
+                                        </div>
+                                        <label class="settings-switch">
+                                            <input type="checkbox" v-model="settingsForm.allowFileManager">
+                                            <span class="settings-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="settings-switch-row">
+                                        <div class="settings-switch-info">
+                                            <div class="settings-switch-label">跨域请求 API 接口</div>
+                                            <div class="settings-switch-desc">HTTP 响应将会加入 access-control-allow-origin: *，可能会降低安全性，但是会提高开发扩展性。</div>
+                                        </div>
+                                        <label class="settings-switch">
+                                            <input type="checkbox" v-model="settingsForm.crossDomain">
+                                            <span class="settings-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="settings-switch-row">
+                                        <div class="settings-switch-info">
+                                            <div class="settings-switch-label">同 IP 登录次数限制</div>
+                                            <div class="settings-switch-desc">此功能将保护您的面板不被单个主机暴力破解密码，每个 IP 只有 5 次密码错误次数。</div>
+                                        </div>
+                                        <label class="settings-switch">
+                                            <input type="checkbox" v-model="settingsForm.loginLimitEnabled">
+                                            <span class="settings-switch-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 数据备份卡片 -->
+                        <div class="mcsm-card">
+                            <div class="mcsm-card-title">
+                                <span class="mcsm-title-bar"></span>
+                                数据备份
+                            </div>
+                            <div class="mcsm-card-body">
+                                <div class="settings-backup-desc">导出或导入面板的用户数据、节点配置等信息，方便迁移或备份。</div>
+                                <div class="settings-backup-actions">
+                                    <button class="mcsm-btn mcsm-btn-primary" @click="exportData('users')">📥 {{ t('settings.exportUsers') }}</button>
+                                    <button class="mcsm-btn mcsm-btn-primary" @click="exportData('nodes')">📥 {{ t('settings.exportNodes') }}</button>
+                                    <label class="mcsm-btn mcsm-btn-success" style="cursor:pointer;">
+                                        📤 {{ t('settings.exportUsers').replace('导出', '导入') }}
+                                        <input type="file" accept=".json" @change="importData('users', $event)" style="display:none">
+                                    </label>
+                                    <label class="mcsm-btn mcsm-btn-success" style="cursor:pointer;">
+                                        📤 {{ t('settings.exportNodes').replace('导出', '导入') }}
+                                        <input type="file" accept=".json" @change="importData('nodes', $event)" style="display:none">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 自定义外观卡片（横跨两列） -->
+                        <div class="mcsm-card settings-about-card">
+                            <div class="mcsm-card-title">
+                                <span class="mcsm-title-bar"></span>
+                                {{ t('settings.appearance') }}
+                            </div>
+                            <div class="mcsm-card-body">
+                                <div class="appearance-section">
+                                    <!-- 左边：自定义颜色 -->
+                                    <div class="appearance-left">
+                                        <div class="appearance-subtitle">🎨 主题配色</div>
+                                        <div class="preset-list">
+                                            <div v-for="preset in themePresets" :key="preset.name"
+                                                 class="preset-item" :class="{ active: themeForm.preset === preset.name }"
+                                                 @click="selectPreset(preset.name)">
+                                                <div class="preset-colors">
+                                                    <span v-for="(color, key) in preset.colors" :key="key" class="preset-color-dot" :style="{ background: color }"></span>
+                                                </div>
+                                                <div class="preset-name">{{ preset.label }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="custom-colors">
+                                            <div class="custom-colors-title">自定义调色</div>
+                                            <div class="color-picker-row">
+                                                <label class="color-picker-label">主色调</label>
+                                                <input type="color" v-model="themeForm.colors['--accent-blue']" @change="applyTheme" class="color-picker-input">
+                                            </div>
+                                            <div class="color-picker-row">
+                                                <label class="color-picker-label">成功色</label>
+                                                <input type="color" v-model="themeForm.colors['--accent-green']" @change="applyTheme" class="color-picker-input">
+                                            </div>
+                                            <div class="color-picker-row">
+                                                <label class="color-picker-label">警告色</label>
+                                                <input type="color" v-model="themeForm.colors['--accent-orange']" @change="applyTheme" class="color-picker-input">
+                                            </div>
+                                            <div class="color-picker-row">
+                                                <label class="color-picker-label">危险色</label>
+                                                <input type="color" v-model="themeForm.colors['--accent-red']" @change="applyTheme" class="color-picker-input">
+                                            </div>
+                                            <div class="color-picker-row">
+                                                <label class="color-picker-label">粉色</label>
+                                                <input type="color" v-model="themeForm.colors['--accent-pink']" @change="applyTheme" class="color-picker-input">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 右边：自定义背景 -->
+                                    <div class="appearance-right">
+                                        <div class="appearance-subtitle">🖼️ 自定义背景</div>
+                                        <div v-if="backgroundList.length > 0" class="bg-list">
+                                            <div v-for="name in backgroundList" :key="name"
+                                                 class="bg-item" :class="{ active: themeForm.background === name }"
+                                                 @click="selectBackground(name)">
+                                                <img :src="'/backgrounds/' + name" class="bg-thumb" :alt="name">
+                                                <div class="bg-item-name">{{ name }}</div>
+                                                <button class="bg-delete-btn" @click.stop="deleteBackground(name)">✕</button>
+                                            </div>
+                                        </div>
+                                        <div v-else class="bg-empty">{{ t('settings.bgEmpty') }}</div>
+                                        <div class="bg-upload-area">
+                                            <label class="bg-upload-btn">
+                                                {{ t('settings.uploadBg') }}
+                                                <input type="file" accept="image/*" @change="uploadBackground" style="display:none">
+                                            </label>
+                                        </div>
+                                        <div class="bg-opacity-area" v-if="themeForm.background">
+                                            <label class="bg-opacity-label">{{ t('settings.bgOpacity') }}：{{ Math.round(themeForm.bgOpacity * 100) }}%</label>
+                                            <input type="range" min="0" max="1" step="0.05" v-model.number="themeForm.bgOpacity" class="bg-opacity-slider">
+                                        </div>
+                                        <button class="mcsm-btn mcsm-btn-primary" @click="saveTheme" :disabled="themeSaving" style="margin-top:12px;width:100%">
+                                            {{ themeSaving ? t('common.saving') : t('settings.saveAppearance') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 关于卡片 -->
+                        <div class="mcsm-card settings-about-card">
+                            <div class="mcsm-card-title">
+                                <span class="mcsm-title-bar"></span>
+                                关于 NovaPanel
+                            </div>
+                            <div class="mcsm-card-body">
+                                <div class="about-section">
+                                    <div class="about-left">
+                                        <div class="about-logo">✦ NovaPanel</div>
+                                        <div class="about-version">版本 1.0.0</div>
+                                        <div class="about-desc">新一代面板 · 轻量 · 高效 · 开箱即用<br>支持 Minecraft 服务器和所有控制台程序的管理面板</div>
+                                    </div>
+                                    <div class="about-right">
+                                        <div class="about-links">
+                                            <a href="https://github.com/NovaPanel-CN/NovaPanel" target="_blank" class="about-link">📦 GitHub 开源地址</a>
+                                            <a href="#" @click.prevent="showToast('info', '📄', '请查看文档页面')" class="about-link">📖 使用文档</a>
+                                        </div>
+                                        <div class="about-copyright">Copyright © 2026 NovaPanel<br>本软件基于开源协议发布，可自由使用与修改</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2FA 设置弹窗 -->
+                <div v-if="show2FASetupModal" class="modal-overlay" @click.self="cancel2FASetup">
+                    <div class="twofa-modal">
+                        <div class="twofa-modal-title">{{ twoFAEnabled ? '关闭两步验证' : '开启两步验证' }}</div>
+                        <template v-if="!twoFAEnabled">
+                            <div class="twofa-modal-desc">{{ t('twofa.modalDesc') }}</div>
+                            <div class="twofa-qr-placeholder">
+                                <div class="twofa-secret-label">{{ t('twofa.secretLabel') }}</div>
+                                <div class="twofa-secret-value" @click="copy2FASecret" title="点击复制">{{ twoFASetupSecret }} 📋</div>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="twofa-modal-desc">{{ t('twofa.disableDesc') }}</div>
+                        </template>
+                        <input type="text" v-model="twoFASetupCode" class="twofa-input" placeholder="000000" maxlength="6">
+                        <div class="twofa-actions">
+                            <button class="mcsm-btn" @click="cancel2FASetup">取消</button>
+                            <button class="mcsm-btn mcsm-btn-primary" @click="twoFAEnabled ? confirm2FADisable() : confirm2FASetup()" :disabled="twoFASettingUp">
+                                {{ twoFASettingUp ? '验证中...' : '确认' }}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1010,6 +1496,8 @@
 
                 // 切换页面：显示 0.3s 圆圈加载动画后切换
                 const switchPage = (target) => {
+                    // 普通用户无法访问管理员页面
+                    if (currentUserPermission.value !== 10 && ['nodes', 'users', 'settings'].includes(target)) return;
                     if (currentPage.value === target || pageLoading.value) return;
                     pageLoading.value = true;
                     setTimeout(() => {
@@ -1019,19 +1507,51 @@
                 };
 
                 // 页面标题映射（top-bar 始终可见，不参与动画）
-                const pageMeta = {
-                    monitor: { title: '数据监控', subtitle: '实时查看系统资源、节点和实例运行状态' },
-                    instances: { title: '应用实例', subtitle: '管理所有 Minecraft 服务器实例' },
-                    quickstart: { title: '快速开始', subtitle: '快速了解面板功能与使用指南' },
-                    nodes: { title: '节点管理', subtitle: '添加、删除、监控远程节点连接状态' },
-                    users: { title: '用户管理', subtitle: '管理面板用户和权限' },
-                    settings: { title: '设置', subtitle: '面板系统配置和优化' },
-                    profile: { title: '个人信息', subtitle: '查看和修改您的个人资料与安全设置' }
-                };
-                const pageTitle = computed(() => (pageMeta[currentPage.value] || pageMeta.monitor).title);
-                const pageSubtitle = computed(() => (pageMeta[currentPage.value] || pageMeta.monitor).subtitle);
+                const pageMeta = computed(() => ({
+                    monitor: { title: t('monitor.title'), subtitle: t('monitor.subtitle') },
+                    instances: { title: t('instances.title'), subtitle: t('instances.subtitle') },
+                    quickstart: { title: t('quickstart.title'), subtitle: t('quickstart.subtitle') },
+                    nodes: { title: t('nodes.title'), subtitle: t('nodes.subtitle') },
+                    users: { title: t('users.title'), subtitle: t('users.subtitle') },
+                    settings: { title: t('settings.title'), subtitle: t('settings.subtitle') },
+                    profile: { title: t('profile.title'), subtitle: t('profile.subtitle') }
+                }));
+                const pageTitle = computed(() => (pageMeta.value[currentPage.value] || pageMeta.value.monitor).title);
+                const pageSubtitle = computed(() => (pageMeta.value[currentPage.value] || pageMeta.value.monitor).subtitle);
 
                 const currentUser = ref('Admin');
+                const currentUserPermission = ref(10);
+
+                // ===== 多语言系统 =====
+                const currentLang = ref(localStorage.getItem('novapanel-lang') || '');
+                const translations = ref({});
+                const langList = [
+                    { code: 'zh_cn', name: '简体中文' },
+                    { code: 'zh_tw', name: '繁體中文' },
+                    { code: 'en_us', name: 'English' },
+                ];
+                const detectSystemLang = () => {
+                    const lang = navigator.language || navigator.userLanguage || 'zh-CN';
+                    if (lang.startsWith('zh-TW') || lang.startsWith('zh-HK') || lang.startsWith('zh-MO')) return 'zh_tw';
+                    if (lang.startsWith('zh')) return 'zh_cn';
+                    if (lang.startsWith('en')) return 'en_us';
+                    return 'zh_cn';
+                };
+                const loadLang = async (lang) => {
+                    try {
+                        const res = await fetch('/lang/' + lang + '.json');
+                        if (res.ok) {
+                            translations.value = await res.json();
+                            currentLang.value = lang;
+                            localStorage.setItem('novapanel-lang', lang);
+                            document.documentElement.lang = lang.replace('_', '-');
+                        }
+                    } catch (e) { console.error('加载语言文件失败:', e); }
+                };
+                const t = (key) => translations.value[key] || key;
+                const changeLang = (lang) => { loadLang(lang); };
+                if (!currentLang.value) { currentLang.value = detectSystemLang(); }
+                loadLang(currentLang.value);
 
                 // ===== 主题系统 =====
                 const currentTheme = ref(localStorage.getItem('novapanel-theme') || 'dark');
@@ -1232,6 +1752,10 @@
                 const loginPassword = ref('');
                 const showLoginPassword = ref(false);
                 const loggingIn = ref(false);
+                const show2FA = ref(false);
+                const twoFAToken = ref('');
+                const twoFACode = ref('');
+                const verifying2FA = ref(false);
                 const login = () => {
                     loggingIn.value = true;
                     fetch('/api/login', {
@@ -1242,17 +1766,64 @@
                     .then(res => res.json())
                     .then(data => {
                         loggingIn.value = false;
+                        if (data.need2FA) {
+                            show2FA.value = true;
+                            twoFAToken.value = data.tempToken;
+                            return;
+                        }
                         if (data.success) {
                             currentUser.value = data.user.username;
+                            currentUserPermission.value = data.user.permission;
                             page.value = 'dashboard';
                             fetchCurrentUserInfo();
                             initAvatar(data.user.avatar || '');
+                        } else {
+                            showToast('error', '⚠️', data.message || '登录失败');
                         }
                     })
                     .catch(() => {
                         loggingIn.value = false;
                         showToast('error', '❌', '网络错误，请重试');
                     });
+                };
+
+                const verify2FA = async () => {
+                    if (!twoFACode.value || twoFACode.value.length !== 6) {
+                        showToast('error', '⚠️', '请输入 6 位验证码'); return;
+                    }
+                    verifying2FA.value = true;
+                    try {
+                        const res = await fetch('/api/login/2fa', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tempToken: twoFAToken.value, code: twoFACode.value })
+                        });
+                        const data = await res.json();
+                        verifying2FA.value = false;
+                        if (data.success) {
+                            show2FA.value = false;
+                            currentUser.value = data.user.username;
+                            currentUserPermission.value = data.user.permission;
+                            page.value = 'dashboard';
+                            fetchCurrentUserInfo();
+                            initAvatar(data.user.avatar || '');
+                            showToast('success', '✅', '登录成功');
+                        } else if (data.need2FA) {
+                            twoFAToken.value = data.tempToken;
+                            showToast('error', '⚠️', data.message || '验证码错误');
+                        } else {
+                            showToast('error', '⚠️', data.message || '验证失败');
+                        }
+                    } catch (e) {
+                        verifying2FA.value = false;
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                };
+
+                const cancel2FA = () => {
+                    show2FA.value = false;
+                    twoFAToken.value = '';
+                    twoFACode.value = '';
                 };
 
                 const logout = () => {
@@ -1286,6 +1857,264 @@
                 const showKeyHelp = ref(false);
                 const addNodeForm = ref({ remark: '', ip: '', port: '', apiKey: '' });
                 const addNodeErrors = ref({ ip: '', port: '', apiKey: '' });
+
+                // ========== 文件管理 ==========
+                const showFileManager = ref(false);
+                const fileManagerNodeId = ref('');
+                const fileManagerNodeName = ref('');
+                const fileCurrentPath = ref('/');
+                const fileList = ref([]);
+                const fileLoading = ref(false);
+                const selectedFile = ref(null);
+                const fileBreadcrumbs = ref([]);
+                const fileInputRef = ref(null);
+                // 文件编辑器
+                const showFileEditor = ref(false);
+                const fileEditorName = ref('');
+                const fileEditorPath = ref('');
+                const fileEditorContent = ref('');
+                const fileEditorSaving = ref(false);
+                // 新建文件/文件夹对话框
+                const showNewFileDialog = ref(false);
+                const newFileType = ref('folder');
+                const newFileName = ref('');
+                // 重命名对话框
+                const showRenameDialog = ref(false);
+                const renameTarget = ref(null);
+                const renameValue = ref('');
+
+                // 文本文件扩展名（用于判断是否可在线编辑）
+                const textFileExts = ['txt','json','yml','yaml','properties','xml','md','log','conf','cfg','ini','sh','bat','cmd','js','ts','go','py','java','c','cpp','h','css','html','sql','toml','env','gitignore','dockerfile'];
+                const isTextFile = (name) => {
+                    const lower = name.toLowerCase();
+                    if (lower === 'dockerfile' || lower === '.gitignore' || lower === '.env') return true;
+                    const ext = lower.split('.').pop();
+                    return textFileExts.includes(ext);
+                };
+                const getFileIcon = (name) => {
+                    const ext = name.split('.').pop().toLowerCase();
+                    const icons = { txt:'📄', json:'📋', yml:'📋', yaml:'📋', properties:'📋', xml:'📋', md:'📝', png:'🖼️', jpg:'🖼️', jpeg:'🖼️', gif:'🖼️', svg:'🖼️', js:'📜', ts:'📜', go:'📜', py:'📜', sh:'📜', zip:'📦', rar:'📦', gz:'📦', tar:'📦', jar:'☕', log:'📃' };
+                    return icons[ext] || '📄';
+                };
+                const formatSize = (bytes) => {
+                    if (bytes < 1024) return bytes + ' B';
+                    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+                    return (bytes / 1073741824).toFixed(1) + ' GB';
+                };
+
+                const updateBreadcrumbs = (path) => {
+                    // 统一路径分隔符为 /
+                    const normalized = (path || '/').replace(/\\/g, '/');
+                    const crumbs = [{ name: '根目录', path: '/' }];
+
+                    if (normalized === '/' || normalized === '') {
+                        fileBreadcrumbs.value = crumbs;
+                        return;
+                    }
+
+                    // 检查 Windows 盘符路径（如 C:/Users/Admin）
+                    const driveMatch = normalized.match(/^([A-Za-z]:)(\/.*)?$/);
+                    let basePath, remaining;
+                    if (driveMatch) {
+                        const drive = driveMatch[1]; // C:
+                        crumbs.push({ name: drive, path: drive + '/' });
+                        basePath = drive + '/';
+                        remaining = (driveMatch[2] || '/').replace(/^\//, '');
+                    } else {
+                        basePath = '/';
+                        remaining = normalized.replace(/^\//, '');
+                    }
+
+                    // 按层级生成面包屑
+                    const parts = remaining.split('/').filter(p => p);
+                    let cur = basePath;
+                    parts.forEach(p => {
+                        cur = cur + p;
+                        crumbs.push({ name: p, path: cur });
+                        cur = cur + '/';
+                    });
+                    fileBreadcrumbs.value = crumbs;
+                };
+
+                const loadFileList = async () => {
+                    fileLoading.value = true;
+                    selectedFile.value = null;
+                    try {
+                        const res = await fetch('/api/file', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ operation: 'list', nodeId: fileManagerNodeId.value, path: fileCurrentPath.value })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            fileCurrentPath.value = data.data.path;
+                            fileList.value = data.data.files || [];
+                            updateBreadcrumbs(data.data.path);
+                        } else { showToast('error', '⚠️', data.message || '加载失败'); }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                    fileLoading.value = false;
+                };
+
+                const openFileManager = (node) => {
+                    if (node.type === 'mcsmanager') { showToast('info', 'ℹ️', 'MCSManager 节点暂不支持文件管理'); return; }
+                    fileManagerNodeId.value = node.id;
+                    fileManagerNodeName.value = node.name || (node.ip + ':' + node.port);
+                    fileCurrentPath.value = '/';
+                    showFileManager.value = true;
+                    loadFileList();
+                };
+                const closeFileManager = () => { showFileManager.value = false; fileList.value = []; selectedFile.value = null; };
+                const navigateToBreadcrumb = (i) => { fileCurrentPath.value = fileBreadcrumbs.value[i].path; loadFileList(); };
+                const openFile = (file) => { if (file.isDir) { fileCurrentPath.value = file.path; loadFileList(); } else if (isTextFile(file.name)) { editFile(file); } };
+                const goUpDir = () => {
+                    const normalized = fileCurrentPath.value.replace(/\\/g, '/');
+                    if (normalized === '/' || normalized === '') return;
+
+                    // Windows 盘符根目录（如 C:/）→ 返回根目录（盘符列表）
+                    if (/^[A-Za-z]:\/?$/.test(normalized)) {
+                        fileCurrentPath.value = '/';
+                        loadFileList();
+                        return;
+                    }
+
+                    // 去掉末尾斜杠后按 / 分割
+                    const cleanPath = normalized.replace(/\/+$/, '');
+                    const idx = cleanPath.lastIndexOf('/');
+                    if (idx <= 0) {
+                        // 可能是盘符路径如 C: （没有后续 /），返回根目录
+                        if (/^[A-Za-z]:$/.test(cleanPath)) {
+                            fileCurrentPath.value = '/';
+                        } else {
+                            fileCurrentPath.value = '/';
+                        }
+                    } else {
+                        const parent = cleanPath.substring(0, idx);
+                        // 如果父路径是盘符（如 C:），补上 /
+                        fileCurrentPath.value = /^[A-Za-z]:$/.test(parent) ? parent + '/' : parent;
+                    }
+                    loadFileList();
+                };
+                const refreshFileList = () => loadFileList();
+                const selectFile = (file) => { selectedFile.value = file; };
+
+                const editFile = async (file) => {
+                    try {
+                        const res = await fetch('/api/file', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ operation: 'read', nodeId: fileManagerNodeId.value, path: file.path })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            fileEditorName.value = data.data.name;
+                            fileEditorPath.value = data.data.path;
+                            fileEditorContent.value = data.data.content;
+                            showFileEditor.value = true;
+                        } else { showToast('error', '⚠️', data.message || '读取失败'); }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                };
+                const closeFileEditor = () => { showFileEditor.value = false; fileEditorContent.value = ''; };
+                const saveFileContent = async () => {
+                    fileEditorSaving.value = true;
+                    try {
+                        const res = await fetch('/api/file', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ operation: 'write', nodeId: fileManagerNodeId.value, path: fileEditorPath.value, content: fileEditorContent.value })
+                        });
+                        const data = await res.json();
+                        if (data.success) { showToast('success', '✅', '文件已保存'); closeFileEditor(); refreshFileList(); }
+                        else { showToast('error', '⚠️', data.message || '保存失败'); }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                    fileEditorSaving.value = false;
+                };
+
+                const downloadFile = async (file) => {
+                    try {
+                        const res = await fetch('/api/file', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ operation: 'download', nodeId: fileManagerNodeId.value, path: file.path })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            const binary = atob(data.data.content);
+                            const bytes = new Uint8Array(binary.length);
+                            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                            const blob = new Blob([bytes]);
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url; a.download = data.data.name; a.click();
+                            URL.revokeObjectURL(url);
+                            showToast('success', '✅', '文件已下载');
+                        } else { showToast('error', '⚠️', data.message || '下载失败'); }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                };
+
+                const triggerUpload = () => { fileInputRef.value && fileInputRef.value.click(); };
+                const handleFileUpload = async (e) => {
+                    const f = e.target.files[0];
+                    if (!f) return;
+                    if (f.size > 50 * 1024 * 1024) { showToast('error', '⚠️', '文件不能超过 50MB'); e.target.value = ''; return; }
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        try {
+                            const base64 = reader.result.split(',')[1];
+                            const uploadPath = (fileCurrentPath.value === '/' ? '' : fileCurrentPath.value) + '/' + f.name;
+                            const res = await fetch('/api/file', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ operation: 'upload', nodeId: fileManagerNodeId.value, path: uploadPath, content: base64 })
+                            });
+                            const data = await res.json();
+                            if (data.success) { showToast('success', '✅', '文件上传成功'); refreshFileList(); }
+                            else { showToast('error', '⚠️', data.message || '上传失败'); }
+                        } catch (err) { showToast('error', '❌', '网络错误: ' + err.message); }
+                    };
+                    reader.readAsDataURL(f);
+                    e.target.value = '';
+                };
+
+                const deleteFile = async (file) => {
+                    if (!confirm('确定删除 "' + file.name + '" 吗？' + (file.isDir ? '\n这将删除文件夹内所有内容！' : ''))) return;
+                    try {
+                        const res = await fetch('/api/file', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ operation: 'delete', nodeId: fileManagerNodeId.value, path: file.path })
+                        });
+                        const data = await res.json();
+                        if (data.success) { showToast('success', '🗑️', '已删除'); refreshFileList(); }
+                        else { showToast('error', '⚠️', data.message || '删除失败'); }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                };
+
+                const showNewFolderDialog = () => { newFileType.value = 'folder'; newFileName.value = ''; showNewFileDialog.value = true; };
+                const showNewFileDialogFn = () => { newFileType.value = 'file'; newFileName.value = ''; showNewFileDialog.value = true; };
+                const confirmNewFile = async () => {
+                    if (!newFileName.value.trim()) { showToast('error', '⚠️', '名称不能为空'); return; }
+                    const fullPath = (fileCurrentPath.value === '/' ? '' : fileCurrentPath.value) + '/' + newFileName.value.trim();
+                    const op = newFileType.value === 'folder' ? 'mkdir' : 'touch';
+                    try {
+                        const res = await fetch('/api/file', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ operation: op, nodeId: fileManagerNodeId.value, path: fullPath })
+                        });
+                        const data = await res.json();
+                        if (data.success) { showToast('success', '✅', newFileType.value === 'folder' ? '文件夹已创建' : '文件已创建'); showNewFileDialog.value = false; refreshFileList(); }
+                        else { showToast('error', '⚠️', data.message || '创建失败'); }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                };
+
+                const renameFile = (file) => { renameTarget.value = file; renameValue.value = file.name; showRenameDialog.value = true; };
+                const confirmRename = async () => {
+                    if (!renameValue.value.trim()) { showToast('error', '⚠️', '名称不能为空'); return; }
+                    const newPath = (fileCurrentPath.value === '/' ? '' : fileCurrentPath.value) + '/' + renameValue.value.trim();
+                    try {
+                        const res = await fetch('/api/file', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ operation: 'rename', nodeId: fileManagerNodeId.value, oldPath: renameTarget.value.path, newPath: newPath })
+                        });
+                        const data = await res.json();
+                        if (data.success) { showToast('success', '✅', '已重命名'); showRenameDialog.value = false; refreshFileList(); }
+                        else { showToast('error', '⚠️', data.message || '重命名失败'); }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                };
 
                 const resetAddNodeForm = () => {
                     addNodeForm.value = { remark: '', ip: '', port: '', apiKey: '' };
@@ -1510,6 +2339,7 @@
                         .then(data => {
                             if (data.success) {
                                 currentUser.value = data.user.username;
+                                currentUserPermission.value = data.user.permission;
                                 page.value = 'dashboard';
                                 // 登录后加载数据
                                 fetchSysInfo();
@@ -1743,15 +2573,398 @@
                 watch(currentPage, (val) => {
                     if (val === 'users') {
                         fetchUsers();
+                    } else if (val === 'settings') {
+                        fetchSettings();
                     }
                 });
+
+                // ===== 设置页 =====
+                const settings = ref({
+                    panelName: 'NovaPanel',
+                    port: 8080,
+                    dataKey: '',
+                    panelCreatedAt: ''
+                });
+                const settingsForm = ref({
+                    panelName: 'NovaPanel',
+                    port: 8080,
+                    sessionTimeout: 10,
+                    debug: false,
+                    hotReload: true,
+                    crossDomain: false,
+                    gzip: true,
+                    pageSize: 10,
+                    maxLoginAttempts: 5,
+                    banDuration: 20,
+                    allowFileManager: true,
+                    loginLimitEnabled: true
+                });
+                const settingsSaving = ref(false);
+
+                const fetchSettings = async () => {
+                    try {
+                        const res = await fetch('/api/settings');
+                        const data = await res.json();
+                        if (data.success && data.data) {
+                            const d = data.data;
+                            settings.value = {
+                                panelName: d.panelName || 'NovaPanel',
+                                port: d.port || 8080,
+                                dataKey: d.dataKey || '',
+                                panelCreatedAt: d.panelCreatedAt || ''
+                            };
+                            settingsForm.value = {
+                                panelName: d.panelName || 'NovaPanel',
+                                port: d.port || 8080,
+                                sessionTimeout: d.sessionTimeout || 10,
+                                debug: !!d.debug,
+                                hotReload: d.hotReload !== false,
+                                crossDomain: !!d.crossDomain,
+                                gzip: d.gzip !== false,
+                                pageSize: d.pageSize || 10,
+                                maxLoginAttempts: d.maxLoginAttempts || 5,
+                                banDuration: d.banDuration || 20,
+                                allowFileManager: d.allowFileManager !== false,
+                                loginLimitEnabled: d.loginLimitEnabled !== false
+                            };
+                        }
+                    } catch (e) {
+                        console.error('获取设置失败:', e);
+                    }
+                    fetch2FAStatus();
+                    fetchTheme();
+                    fetchBackgroundList();
+                };
+
+                const saveSettings = async () => {
+                    if (!settingsForm.value.panelName || !settingsForm.value.panelName.trim()) {
+                        showToast('error', '⚠️', '面板名称不能为空'); return;
+                    }
+                    if (settingsForm.value.port < 1 || settingsForm.value.port > 65535) {
+                        showToast('error', '⚠️', '端口范围 1-65535'); return;
+                    }
+                    settingsSaving.value = true;
+                    try {
+                        const res = await fetch('/api/settings/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(settingsForm.value)
+                        });
+                        const data = await res.json();
+                        settingsSaving.value = false;
+                        if (data.success) {
+                            showRefreshToast('success', data.message || '配置更新成功');
+                            fetchSettings();
+                        } else {
+                            showToast('error', '⚠️', data.message || '保存失败');
+                        }
+                    } catch (e) {
+                        settingsSaving.value = false;
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                };
+
+                const refreshSettings = async () => {
+                    showRefreshToast('loading', '正在刷新配置...');
+                    await fetchSettings();
+                    showRefreshToast('success', '配置已刷新');
+                };
+
+                const resetSettingsForm = () => {
+                    settingsForm.value = {
+                        panelName: settings.value.panelName,
+                        port: settings.value.port,
+                        sessionTimeout: 10,
+                        debug: false,
+                        hotReload: true,
+                        crossDomain: false,
+                        gzip: true,
+                        pageSize: 10,
+                        maxLoginAttempts: 5,
+                        banDuration: 20,
+                        allowFileManager: true,
+                        loginLimitEnabled: true
+                    };
+                    showToast('info', '↩️', '表单已重置');
+                };
+
+                const resetDataKey = async () => {
+                    if (!confirm('确定要重置 DataKey 吗？\n\n重置后，所有已连接的守护进程将需要重新配置密钥才能连接！')) return;
+                    try {
+                        const res = await fetch('/api/settings/reset-key', { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('success', '🔄', data.message || 'DataKey 已重置');
+                            fetchSettings();
+                        } else {
+                            showToast('error', '⚠️', data.message || '重置失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                };
+
+                const exportData = (type) => {
+                    window.open('/api/export/' + type, '_blank');
+                };
+                const importData = async (type, event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    if (!confirm('确定要导入 ' + file.name + ' 吗？这将覆盖当前的' + (type === 'users' ? '用户' : '节点') + '数据！')) {
+                        event.target.value = '';
+                        return;
+                    }
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const res = await fetch('/api/import/' + type, { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('success', '✅', '导入成功：' + (data.message || ''));
+                            if (type === 'users') fetchUsers();
+                            if (type === 'nodes') fetchNodes();
+                        } else {
+                            showToast('error', '❌', data.message || '导入失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                    event.target.value = '';
+                };
+
+                // ===== 2FA 设置（用户级别） =====
+                const twoFAEnabled = ref(false);
+                const show2FASetupModal = ref(false);
+                const twoFASetupSecret = ref('');
+                const twoFASetupQrUrl = ref('');
+                const twoFASetupCode = ref('');
+                const twoFASettingUp = ref(false);
+
+                const fetch2FAStatus = async () => {
+                    try {
+                        const res = await fetch('/api/2fa/status');
+                        const data = await res.json();
+                        if (data.success) twoFAEnabled.value = data.enabled;
+                    } catch (e) { console.error('获取2FA状态失败:', e); }
+                };
+
+                const toggle2FA = () => {
+                    if (twoFAEnabled.value) {
+                        show2FASetupModal.value = true;
+                        twoFASetupSecret.value = '';
+                        twoFASetupQrUrl.value = '';
+                        twoFASetupCode.value = '';
+                        twoFASettingUp.value = false;
+                    } else {
+                        setup2FA();
+                    }
+                };
+
+                const setup2FA = async () => {
+                    try {
+                        const res = await fetch('/api/2fa/setup', { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            twoFASetupSecret.value = data.secret;
+                            twoFASetupQrUrl.value = data.qrUrl;
+                            show2FASetupModal.value = true;
+                        } else {
+                            showToast('error', '⚠️', data.message || '设置失败');
+                        }
+                    } catch (e) {
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                };
+
+                const confirm2FASetup = async () => {
+                    if (!twoFASetupCode.value || twoFASetupCode.value.length !== 6) {
+                        showToast('error', '⚠️', '请输入 6 位验证码'); return;
+                    }
+                    twoFASettingUp.value = true;
+                    try {
+                        const res = await fetch('/api/2fa/verify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code: twoFASetupCode.value })
+                        });
+                        const data = await res.json();
+                        twoFASettingUp.value = false;
+                        if (data.success) {
+                            twoFAEnabled.value = true;
+                            show2FASetupModal.value = false;
+                            showToast('success', '✅', '2FA 已开启');
+                        } else {
+                            showToast('error', '⚠️', data.message || '验证码错误');
+                        }
+                    } catch (e) {
+                        twoFASettingUp.value = false;
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                };
+
+                const confirm2FADisable = async () => {
+                    if (!twoFASetupCode.value || twoFASetupCode.value.length !== 6) {
+                        showToast('error', '⚠️', '请输入 6 位验证码'); return;
+                    }
+                    twoFASettingUp.value = true;
+                    try {
+                        const res = await fetch('/api/2fa/disable', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code: twoFASetupCode.value })
+                        });
+                        const data = await res.json();
+                        twoFASettingUp.value = false;
+                        if (data.success) {
+                            twoFAEnabled.value = false;
+                            show2FASetupModal.value = false;
+                            showToast('success', '🔓', '2FA 已关闭');
+                        } else {
+                            showToast('error', '⚠️', data.message || '验证码错误');
+                        }
+                    } catch (e) {
+                        twoFASettingUp.value = false;
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                };
+
+                const cancel2FASetup = () => {
+                    show2FASetupModal.value = false;
+                    twoFASetupSecret.value = '';
+                    twoFASetupQrUrl.value = '';
+                    twoFASetupCode.value = '';
+                };
+
+                const copy2FASecret = () => {
+                    copyToClipboard(twoFASetupSecret.value);
+                    showToast('success', '📋', '密钥已复制到剪贴板');
+                };
+
+                // ===== 自定义主题 =====
+                const themePresets = [
+                    { name: 'default', label: '默认暗黑', colors: { '--accent-blue': '#58a6ff', '--accent-green': '#3fb950', '--accent-orange': '#f0883e', '--accent-pink': '#f778ba', '--accent-red': '#f85149' } },
+                    { name: 'ocean', label: '海洋蓝', colors: { '--accent-blue': '#00b4d8', '--accent-green': '#06d6a0', '--accent-orange': '#ffd166', '--accent-pink': '#ef476f', '--accent-red': '#ef476f' } },
+                    { name: 'forest', label: '森林绿', colors: { '--accent-blue': '#2d6a4f', '--accent-green': '#52b788', '--accent-orange': '#e07a5f', '--accent-pink': '#d4a373', '--accent-red': '#e63946' } },
+                    { name: 'sakura', label: '樱花粉', colors: { '--accent-blue': '#a78bfa', '--accent-green': '#86efac', '--accent-orange': '#fbbf24', '--accent-pink': '#f472b6', '--accent-red': '#fb7185' } },
+                    { name: 'sunset', label: '日落橙', colors: { '--accent-blue': '#60a5fa', '--accent-green': '#34d399', '--accent-orange': '#fb923c', '--accent-pink': '#f472b6', '--accent-red': '#f87171' } },
+                ];
+                const themeForm = ref({ preset: 'default', colors: {}, background: '', bgOpacity: 0.8 });
+                const backgroundList = ref([]);
+                const themeSaving = ref(false);
+
+                const applyTheme = () => {
+                    const root = document.documentElement;
+                    const preset = themePresets.find(p => p.name === themeForm.value.preset);
+                    if (preset) {
+                        Object.entries(preset.colors).forEach(([k, v]) => root.style.setProperty(k, v));
+                    }
+                    Object.entries(themeForm.value.colors || {}).forEach(([k, v]) => {
+                        if (v) root.style.setProperty(k, v);
+                    });
+                };
+
+                const fetchTheme = async () => {
+                    try {
+                        const res = await fetch('/api/theme');
+                        const data = await res.json();
+                        if (data.success && data.data) {
+                            themeForm.value = {
+                                preset: data.data.preset || 'default',
+                                colors: data.data.colors || {},
+                                background: data.data.background || '',
+                                bgOpacity: data.data.bgOpacity || 0.8
+                            };
+                            applyTheme();
+                        }
+                    } catch (e) { console.error('获取主题失败:', e); }
+                };
+
+                const selectPreset = (name) => {
+                    themeForm.value.preset = name;
+                    themeForm.value.colors = {};
+                    applyTheme();
+                };
+
+                const saveTheme = async () => {
+                    themeSaving.value = true;
+                    try {
+                        const res = await fetch('/api/theme/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(themeForm.value)
+                        });
+                        const data = await res.json();
+                        themeSaving.value = false;
+                        if (data.success) {
+                            showToast('success', '✅', '外观设置已保存');
+                            fetchTheme();
+                        } else {
+                            showToast('error', '⚠️', data.message || '保存失败');
+                        }
+                    } catch (e) {
+                        themeSaving.value = false;
+                        showToast('error', '❌', '网络错误: ' + e.message);
+                    }
+                };
+
+                const fetchBackgroundList = async () => {
+                    try {
+                        const res = await fetch('/api/background/list');
+                        const data = await res.json();
+                        if (data.success) backgroundList.value = data.data || [];
+                    } catch (e) { console.error('获取背景列表失败:', e); }
+                };
+
+                const uploadBackground = (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    fetch('/api/background/upload', { method: 'POST', body: formData })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                showToast('success', '✅', '上传成功');
+                                themeForm.value.background = data.name;
+                                fetchBackgroundList();
+                            } else {
+                                showToast('error', '⚠️', data.message || '上传失败');
+                            }
+                        })
+                        .catch(e => showToast('error', '❌', '网络错误: ' + e.message));
+                };
+
+                const selectBackground = (name) => {
+                    themeForm.value.background = name;
+                };
+
+                const deleteBackground = async (name) => {
+                    if (!confirm('确定删除这个背景吗？')) return;
+                    try {
+                        const res = await fetch('/api/background/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('success', '✅', '已删除');
+                            if (themeForm.value.background === name) themeForm.value.background = '';
+                            fetchBackgroundList();
+                        } else {
+                            showToast('error', '⚠️', data.message || '删除失败');
+                        }
+                    } catch (e) { showToast('error', '❌', '网络错误: ' + e.message); }
+                };
 
                 return {
                     appVisible, page, currentPage, pageLoading, switchPage, pageTitle, pageSubtitle, goTo,
                     toast, refreshToast,
                     regUsername, regPassword, showRegPassword, creating, isUsernameValid, isPasswordValid, createAdmin,
                     loginUsername, loginPassword, showLoginPassword, loggingIn, login,
-                    currentUser, logout,
+                    show2FA, twoFAToken, twoFACode, verifying2FA, verify2FA, cancel2FA,
+                    currentUser, currentUserPermission, logout,
+                    currentLang, translations, langList, t, changeLang,
                     currentTheme, showThemeDropdown, setTheme, appliedTheme,
                     showProfilePanel, profileAvatar, initAvatar, currentUserUuid, currentUserCreated, currentUserLastLogin, changeAvatar,
                     profileOldPass, profileNewPass, profileConfirmPass, updateProfilePassword,
@@ -1760,6 +2973,19 @@
                     showAddNodeModal, nodeType, addNodeForm, addNodeErrors, showKeyHelp,
                     switchNodeType, closeAddNodeModal, confirmAddNode, deleteNode, fetchNodes,
                     buildChartPoints, copyToClipboard, updateNodeAddr, updateNodeKey,
+                    // 文件管理
+                    showFileManager, fileManagerNodeName, fileCurrentPath, fileList, fileLoading,
+                    selectedFile, fileBreadcrumbs, fileInputRef,
+                    showFileEditor, fileEditorName, fileEditorContent, fileEditorSaving,
+                    showNewFileDialog, newFileType, newFileName,
+                    showRenameDialog, renameValue,
+                    openFileManager, closeFileManager, loadFileList, navigateToBreadcrumb,
+                    openFile, goUpDir, refreshFileList, selectFile,
+                    isTextFile, getFileIcon, formatSize,
+                    editFile, closeFileEditor, saveFileContent, downloadFile,
+                    triggerUpload, handleFileUpload, deleteFile,
+                    showNewFolderDialog, showNewFileDialogFn, confirmNewFile,
+                    renameFile, confirmRename,
                     requestPoints, requestPath, requestTotal, requestLabels,
                     cpuPath, cpuLabels,
                     instanceRunning, instanceTotal, instancePath, instanceLabels,
@@ -1771,7 +2997,13 @@
                     fetchUsers, openCreateUserModal, createUser,
                     openEditUserModal, updateUser,
                     deleteSingleUser, confirmDeleteSelected,
-                    toggleSelectAll, toggleSelectUser
+                    toggleSelectAll, toggleSelectUser,
+                    settings, settingsForm, settingsSaving,
+                    fetchSettings, saveSettings, refreshSettings, resetSettingsForm, exportData, importData, resetDataKey,
+                    twoFAEnabled, show2FASetupModal, twoFASetupSecret, twoFASetupQrUrl, twoFASetupCode, twoFASettingUp,
+                    fetch2FAStatus, toggle2FA, setup2FA, confirm2FASetup, confirm2FADisable, cancel2FASetup, copy2FASecret,
+                    themePresets, themeForm, backgroundList, themeSaving,
+                    fetchTheme, applyTheme, selectPreset, saveTheme, fetchBackgroundList, uploadBackground, selectBackground, deleteBackground
                 };
             }
         });

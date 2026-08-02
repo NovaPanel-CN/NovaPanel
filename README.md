@@ -24,7 +24,7 @@
 <table>
   <tr>
     <td align="center" style="background-color: #ffebee; color: #48c628; padding: 12px; border-radius: 6px;">
-      <strong>🕰️ 最后更新时间:2026年07月09日</strong>
+      <strong>🕰️ 最后更新时间:2026年08月02日</strong>
     </td>
   </tr>
 </table>
@@ -41,7 +41,7 @@
 <table>
   <tr>
     <td align="center" style="background-color: #ffebee; color: #c6bb28; padding: 12px; border-radius: 6px;">
-      <strong>💡 Tips：预览 & 开发请点击dev.bat，日常使用请点击run.bat即可，但是未开发完善，不建议使用run.bat！</strong>
+      <strong>💡 Tips：2FA只支持手动输入而不支持扫码，望有缘人可以帮忙解决一下问题并pr到此项目</strong>
     </td>
   </tr>
 </table>
@@ -50,7 +50,7 @@
 
 ## 📖 介绍
 
-这是来自作者 **0721xun** 编写的一个基于 **MCSManager** 的 **NovaPanel 轻量面板**，一款开箱即用的服务器管理面板，专为 **Minecraft 服务器**和**所有控制台程序**设计。
+这是来自作者 **0721xun（现改名为missqwq）** 编写的一个基于 **MCSManager** 的 **NovaPanel 轻量面板**，一款开箱即用的服务器管理面板，专为 **Minecraft 服务器**和**所有控制台程序**设计。
 
 NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无需复杂的配置，下载即用。
 
@@ -66,7 +66,7 @@ NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无
 - 🌐 **远程节点跨平台支持** - 支持 NovaPanel / MCSManager daemon
 - 🔥 **热重载开发** - 修改代码自动刷新，开发体验流畅
 - 📊 **实时监控** - 系统信息总览，CPU/内存/磁盘实时监控
-- 🔐 **安全认证** - 账号密码登录，保障面板安全
+- 🔐 **安全认证** - 账号密码登录，保障面板安全，支持2FA和防爆破，欢迎尝鲜
 
 ---
 
@@ -86,7 +86,7 @@ NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无
 
 ### 环境要求
 
-- Windows 10/Windows Server 2022
+- Windows Server / linux ubuntu server
 - **需要安装 Go**（推荐 1.21+）：https://golang.google.cn/dl/
 - **Node.js 已内置**，无需额外安装
 
@@ -95,12 +95,16 @@ NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无
 ### 下载与启动
 
 ```bash
-# 克隆项目（需要先Fork本仓库）
+# windows克隆项目（需要先Fork本仓库）
 git clone https://github.com/你的用户名/NovaPanel.git
 cd NovaPanel
 
-# 预览请直接启动（Node.js 已内置）
-dev.bat
-
-# 正常使用请直接启动（Node.js 已内置）
+# windows正常使用请直接启动（Node.js 已内置）
 run.bat
+
+# linux克隆项目（需要先Fork本仓库）
+cd /opt
+git clone https://github.com/你的用户名/NovaPanel.git
+
+# linux正常使用请直接启动（会自动安装和设置开机自启）
+run.sh
