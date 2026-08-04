@@ -6,9 +6,11 @@
 
 > 輕量 · 高效率 · 開箱即用的伺服器管理面板（早期開發版）
 <div align="center">
+
 [![Preview](https://img.shields.io/badge/status-preview-orange.svg)]()
 [![Go Version](https://img.shields.io/badge/Go-1.26.4-00ADD8?logo=go)](https://golang.org/)
 [![Node Version](https://img.shields.io/badge/Node-22.14.0-339933?logo=node.js)](https://nodejs.org/)
+
 </div>
 
 <p align="center">
