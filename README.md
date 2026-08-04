@@ -17,7 +17,6 @@
 <img src="images/Panel-2026-08-04.png" alt="Panel" width="780">
 </p>
 
----
 
 <div align="center">
 

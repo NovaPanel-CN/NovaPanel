@@ -17,8 +17,6 @@
 <img src="images/Panel-2026-08-04.png" alt="Panel" width="780">
 </p>
 
----
-
 <div align="center">
 
 [English](README.md) - [简体中文](README_ZH.md) - [繁體中文](README_TW.md)
