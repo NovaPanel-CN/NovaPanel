@@ -103,9 +103,9 @@ NovaPanel 致力于提供**轻量、高效、开箱即用**的管理体验，无
 ### 下载与启动
 
 ```bash
-# windows克隆项目（需要先Fork本仓库）
-git clone https://github.com/你的用户名/NovaPanel.git
-cd NovaPanel
+# windows克隆项目
+git clone https://github.com/VelunexPanel/VelunexPanel.git
+cd VelunexPanel
 
 # 或者直接打开该链接下载即可
 点我下载→ https://github.com/VelunexPanel/VelunexPanel/archive/refs/heads/main.zip
@@ -114,13 +114,13 @@ cd NovaPanel
 # windows正常使用请直接启动（Node.js 已内置）
 run.bat
 
-# linux克隆项目（需要先Fork本仓库）
-cd /opt
-git clone https://github.com/你的用户名/NovaPanel.git
+# linux克隆项目
+cd /opt/VelunexPanel
+git clone https://github.com/VelunexPanel/VelunexPanel.git
 
 # 或者直接打开该链接下载即可
 点我下载→ https://github.com/VelunexPanel/VelunexPanel/archive/refs/heads/main.zip
 
 # linux正常使用请直接启动（会自动安装和设置开机自启）
-cd /opt/NovaPanel
+cd /opt/VelunexPanel
 run.sh

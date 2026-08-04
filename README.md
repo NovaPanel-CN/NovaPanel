@@ -103,9 +103,9 @@ NovaPanel aims to deliver a **lightweight, efficient, and ready-to-use** managem
 ### Download & Launch
 
 ```bash
-# Clone the project (Fork this repository first)
-git clone https://github.com/your-username/NovaPanel.git
-cd NovaPanel
+# Clone the project
+git clone https://github.com/VelunexPanel/VelunexPanel.git
+cd VelunexPanel
 
 # Or simply click the link below to download
 Click here to download → https://github.com/VelunexPanel/VelunexPanel/archive/refs/heads/main.zip
@@ -113,13 +113,13 @@ Click here to download → https://github.com/VelunexPanel/VelunexPanel/archive/
 # For Windows: simply launch to use (Node.js is built-in)
 run.bat
 
-# For Linux: clone the project (please fork this repository first)
-cd /opt
-git clone https://github.com/your-username/NovaPanel.git
+# For Linux: clone the project
+cd /opt/VelunexPanel
+git clone https://github.com/VelunexPanel/VelunexPanel.git
 
 # Or simply click this link to download
 Click here to download → https://github.com/VelunexPanel/VelunexPanel/archive/refs/heads/main.zip
 
 # For Linux: simply launch to use (automatically installs and sets up startup on boot)
-cd /opt/NovaPanel
+cd /opt/VelunexPanel
 run.sh
