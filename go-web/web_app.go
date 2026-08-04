@@ -28,6 +28,7 @@ import (
 
 const (
 	HTTP_PORT = 8080
+	WEB_VER   = "1.0.0"
 )
 
 var projectRoot string
@@ -67,6 +68,14 @@ func generateUUID() string {
 	return fmt.Sprintf("%x", b)
 }
 
+// getAvatarURL 根据头像文件名生成完整 URL
+func getAvatarURL(avatar string) string {
+	if avatar != "" {
+		return "/avatars/" + avatar
+	}
+	return ""
+}
+
 // permissionName 权限等级转文字
 func permissionName(p int) string {
 	switch p {
@@ -83,23 +92,31 @@ func permissionName(p int) string {
 
 // ========== 系统信息结构 ==========
 type SysInfo struct {
-	OS           string  `json:"os"`
-	OSVersion    string  `json:"osVersion"`
-	Hostname     string  `json:"hostname"`
-	CurrentUser  string  `json:"currentUser"`
-	Uptime       string  `json:"uptime"`
-	CpuUsage     float64 `json:"cpuUsage"`
-	CpuCores     int     `json:"cpuCores"`
-	MemTotal     float64 `json:"memTotal"`
-	MemUsed      float64 `json:"memUsed"`
-	MemPercent   float64 `json:"memPercent"`
-	DiskTotal    float64 `json:"diskTotal"`
-	DiskUsed     float64 `json:"diskUsed"`
-	DiskPercent  float64 `json:"diskPercent"`
-	NetSent      string  `json:"netSent"`
-	NetRecv      string  `json:"netRecv"`
-	ProcessCount int     `json:"processCount"`
-	LastUpdate   string  `json:"lastUpdate"`
+	OS             string  `json:"os"`
+	OSVersion      string  `json:"osVersion"`
+	Hostname       string  `json:"hostname"`
+	CurrentUser    string  `json:"currentUser"`
+	Uptime         string  `json:"uptime"`
+	UptimeSeconds  int64   `json:"uptimeSeconds"`
+	CpuUsage       float64 `json:"cpuUsage"`
+	CpuCores       int     `json:"cpuCores"`
+	MemTotal       float64 `json:"memTotal"`
+	MemUsed        float64 `json:"memUsed"`
+	MemPercent     float64 `json:"memPercent"`
+	DiskTotal      float64 `json:"diskTotal"`
+	DiskUsed       float64 `json:"diskUsed"`
+	DiskPercent    float64 `json:"diskPercent"`
+	NetSent        string  `json:"netSent"`
+	NetRecv        string  `json:"netRecv"`
+	ProcessCount   int     `json:"processCount"`
+	LastUpdate     string  `json:"lastUpdate"`
+	LastUpdateUnix int64   `json:"lastUpdateUnix"`
+}
+
+var sysInfoCache struct {
+	sync.Mutex
+	value   SysInfo
+	updated time.Time
 }
 
 // ========== 节点数据结构 ==========
@@ -148,7 +165,38 @@ type ActionResponse struct {
 	Message string `json:"message"`
 }
 
+func startupText(key string) string {
+	lang := os.Getenv("NOVAPANEL_LANG")
+	texts := map[string][3]string{
+		"started": {"Web panel started successfully", "控制面板端已启动", "控制面板端已啟動"},
+		"address": {"Access URL", "访问地址", "存取位址"},
+		"close":   {"Press Ctrl+C to stop", "关闭此程序请使用 Ctrl+C 快捷键", "關閉此程式請使用 Ctrl+C 快捷鍵"},
+		"failed":  {"Startup failed", "启动失败", "啟動失敗"},
+	}
+	i := 0
+	if lang == "zh_cn" {
+		i = 1
+	} else if lang == "zh_tw" {
+		i = 2
+	}
+	return texts[key][i]
+}
+
 // ========== 节点列表 ==========
+func printStartupBanner(component, version string) {
+	fmt.Println()
+	fmt.Println(`V     V  EEEEEEE  L        U     U  N     N  EEEEEEE  X     X`)
+	fmt.Println(` V   V   E        L        U     U  NN    N  E         X   X `)
+	fmt.Println(`  V V    EEEEE    L        U     U  N N   N  EEEEE      X X  `)
+	fmt.Println(`   V     E        L        U     U  N  N  N  E           X   `)
+	fmt.Println(`   V     EEEEEEE  LLLLLLL   UUUUU   N   N N  EEEEEEE   X     `)
+	fmt.Println()
+	fmt.Printf("                    Velunex Panel | %s\n", component)
+	fmt.Printf("                    Version %s\n", version)
+	fmt.Println("                    Copyright (C) 2026 Velunex Panel")
+	fmt.Println()
+}
+
 var nodes = []Node{}
 var nodesMu sync.RWMutex
 
@@ -415,7 +463,7 @@ func loadPanelSettings() {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// 首次启动：写入默认设置
-			panelSettings.PanelName = "NovaPanel"
+			panelSettings.PanelName = "Velunex Panel"
 			panelSettings.Port = HTTP_PORT
 			panelSettings.SessionTimeout = 10
 			panelSettings.Debug = false
@@ -440,7 +488,7 @@ func loadPanelSettings() {
 	}
 	// 兜底默认值
 	if panelSettings.PanelName == "" {
-		panelSettings.PanelName = "NovaPanel"
+		panelSettings.PanelName = "Velunex Panel"
 	}
 	if panelSettings.Port == 0 {
 		panelSettings.Port = HTTP_PORT
@@ -776,7 +824,7 @@ func verifyTOTPCode(secret, code string) bool {
 }
 
 func generateOTPAuthURL(secret, account string) string {
-	return fmt.Sprintf("otpauth://totp/NovaPanel:%s?secret=%s&issuer=NovaPanel", account, secret)
+	return fmt.Sprintf("otpauth://totp/Velunex%%20Panel:%s?secret=%s&issuer=Velunex%%20Panel", account, secret)
 }
 
 // 2FA 登录临时令牌
@@ -885,7 +933,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]interface{}{
 			"username":   req.Username,
 			"uuid":       user.UUID,
-			"avatar":     user.Avatar,
+			"avatar":     getAvatarURL(user.Avatar),
 			"email":      user.Email,
 			"bio":        user.Bio,
 			"permission": user.Permission,
@@ -935,7 +983,7 @@ func handleCheckSession(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]interface{}{
 			"username":   cookie.Value,
 			"uuid":       user.UUID,
-			"avatar":     user.Avatar,
+			"avatar":     getAvatarURL(user.Avatar),
 			"email":      user.Email,
 			"bio":        user.Bio,
 			"permission": user.Permission,
@@ -970,6 +1018,7 @@ type UserPublicInfo struct {
 	CreatedAt    string `json:"createdAt"`
 	LastLogin    string `json:"lastLogin"`
 	TwoFAEnabled bool   `json:"twoFAEnabled"`
+	Avatar       string `json:"avatar"`
 }
 
 // handleUserList 获取用户列表
@@ -990,6 +1039,7 @@ func handleUserList(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:    u.CreatedAt,
 			LastLogin:    u.LastLogin,
 			TwoFAEnabled: u.TwoFAEnabled,
+			Avatar:       getAvatarURL(u.Avatar),
 		})
 	}
 	if list == nil {
@@ -1369,7 +1419,7 @@ func handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.PanelName == "" {
-		req.PanelName = "NovaPanel"
+		req.PanelName = "Velunex Panel"
 	}
 	if req.Port < 1 || req.Port > 65535 {
 		sendJSON(w, map[string]interface{}{"success": false, "message": "端口范围 1-65535"})
@@ -1716,7 +1766,7 @@ func handleLogin2FA(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]interface{}{
 			"username":   username,
 			"uuid":       user.UUID,
-			"avatar":     user.Avatar,
+			"avatar":     getAvatarURL(user.Avatar),
 			"email":      user.Email,
 			"bio":        user.Bio,
 			"permission": user.Permission,
@@ -1728,14 +1778,14 @@ func handleLogin2FA(w http.ResponseWriter, r *http.Request) {
 
 // ========== 自定义主题与背景 ==========
 type ThemeConfig struct {
-	Preset     string            `json:"preset"`
-	Colors     map[string]string `json:"colors"`
-	Background string            `json:"background"`
-	BgOpacity  float64           `json:"bgOpacity"`
+	Preset         string            `json:"preset"`
+	Colors         map[string]string `json:"colors"`
+	Background     string            `json:"background"`
+	ControlOpacity float64           `json:"controlOpacity"`
 }
 
 var (
-	themeConfig   = &ThemeConfig{Preset: "default", Colors: map[string]string{}, BgOpacity: 0.8}
+	themeConfig   = &ThemeConfig{Preset: "default", Colors: map[string]string{}, ControlOpacity: 1}
 	themeConfigMu sync.RWMutex
 )
 
@@ -1754,15 +1804,15 @@ func loadThemeConfig() {
 	if err != nil {
 		themeConfig.Preset = "default"
 		themeConfig.Colors = map[string]string{}
-		themeConfig.BgOpacity = 0.8
+		themeConfig.ControlOpacity = 1
 		return
 	}
 	json.Unmarshal(data, themeConfig)
 	if themeConfig.Colors == nil {
 		themeConfig.Colors = map[string]string{}
 	}
-	if themeConfig.BgOpacity == 0 {
-		themeConfig.BgOpacity = 0.8
+	if themeConfig.ControlOpacity == 0 {
+		themeConfig.ControlOpacity = 1
 	}
 	log.Printf("🎨 加载主题配置: 预设=%s, 背景=%s", themeConfig.Preset, themeConfig.Background)
 }
@@ -1787,10 +1837,10 @@ func handleThemeGet(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, map[string]interface{}{
 		"success": true,
 		"data": map[string]interface{}{
-			"preset":     themeConfig.Preset,
-			"colors":     themeConfig.Colors,
-			"background": themeConfig.Background,
-			"bgOpacity":  themeConfig.BgOpacity,
+			"preset":         themeConfig.Preset,
+			"colors":         themeConfig.Colors,
+			"background":     themeConfig.Background,
+			"controlOpacity": themeConfig.ControlOpacity,
 		},
 	})
 }
@@ -1823,7 +1873,7 @@ func handleThemeSave(w http.ResponseWriter, r *http.Request) {
 		themeConfig.Colors = req.Colors
 	}
 	themeConfig.Background = req.Background
-	themeConfig.BgOpacity = req.BgOpacity
+	themeConfig.ControlOpacity = req.ControlOpacity
 	saveThemeConfigLocked()
 	themeConfigMu.Unlock()
 	log.Printf("🎨 管理员更新主题配置: %s", cookie.Value)
@@ -1951,6 +2001,11 @@ func handleSysInfo(w http.ResponseWriter, r *http.Request) {
 
 // ========== 系统信息获取函数 ==========
 func getSystemInfo() SysInfo {
+	sysInfoCache.Lock()
+	defer sysInfoCache.Unlock()
+	if !sysInfoCache.updated.IsZero() && time.Since(sysInfoCache.updated) < 15*time.Second {
+		return sysInfoCache.value
+	}
 	info := SysInfo{}
 	info.OS = runtime.GOOS
 	info.OSVersion = getOSVersion()
@@ -1967,11 +2022,16 @@ func getSystemInfo() SysInfo {
 	info.CpuUsage = getCPUUsage()
 	info.MemTotal, info.MemUsed, info.MemPercent = getMemoryInfo()
 	info.DiskTotal, info.DiskUsed, info.DiskPercent = getDiskInfo()
-	info.Uptime = getSystemUptime()
+	uptime := getSystemUptime()
+	info.Uptime = formatUptimeSimple(uptime)
+	info.UptimeSeconds = int64(uptime.Seconds())
 	info.ProcessCount = getProcessCount()
 	info.NetSent = fmt.Sprintf("%.1f MB", float64(10+time.Now().Unix()%50))
 	info.NetRecv = fmt.Sprintf("%.1f MB", float64(20+time.Now().Unix()%80))
 	info.LastUpdate = time.Now().Format("2006-01-02 15:04:05")
+	info.LastUpdateUnix = time.Now().Unix()
+	sysInfoCache.value = info
+	sysInfoCache.updated = time.Now()
 	return info
 }
 
@@ -2159,7 +2219,7 @@ func getDiskInfo() (total, used, percent float64) {
 	return
 }
 
-func getSystemUptime() string {
+func getSystemUptime() time.Duration {
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command("powershell", "-Command", "(Get-CimInstance Win32_OperatingSystem).LastBootUpTime")
 		out, err := cmd.Output()
@@ -2170,7 +2230,7 @@ func getSystemUptime() string {
 				bootTime, err := time.Parse("20060102150405", timeStr)
 				if err == nil {
 					uptime := time.Since(bootTime)
-					return formatUptimeSimple(uptime)
+					return uptime
 				}
 			}
 		}
@@ -2181,11 +2241,11 @@ func getSystemUptime() string {
 			if len(fields) > 0 {
 				seconds, _ := strconv.ParseFloat(fields[0], 64)
 				uptime := time.Duration(seconds) * time.Second
-				return formatUptimeSimple(uptime)
+				return uptime
 			}
 		}
 	}
-	return "0时 0分"
+	return 0
 }
 
 func getProcessCount() int {
@@ -2265,7 +2325,7 @@ func handleNodeAdd(w http.ResponseWriter, r *http.Request) {
 		if nodeType == "mcsmanager" {
 			sendJSON(w, map[string]interface{}{"success": false, "message": "MCSManager 节点密钥不能为空"})
 		} else {
-			sendJSON(w, map[string]interface{}{"success": false, "message": "NovaPanel 节点密钥不能为空"})
+			sendJSON(w, map[string]interface{}{"success": false, "message": "Velunex Panel 节点密钥不能为空"})
 		}
 		return
 	}
@@ -2561,11 +2621,17 @@ func connectToNode(node Node) {
 			err = conn.WriteJSON(map[string]string{"type": "get_instances"})
 			writeMutex.Unlock()
 			if err != nil {
-				continue
+				log.Printf("⚠️ 发送实例请求失败: %v，5秒后重连...", err)
+				updateNodeStatus(node.ID, "offline", 0, 0, 0, 0, 0, 0)
+				disconnected = true
+				break
 			}
 			var instResp map[string]interface{}
 			if err := conn.ReadJSON(&instResp); err != nil {
-				continue
+				log.Printf("⚠️ 读取实例响应失败: %v，5秒后重连...", err)
+				updateNodeStatus(node.ID, "offline", 0, 0, 0, 0, 0, 0)
+				disconnected = true
+				break
 			}
 			if data, ok := instResp["data"].([]interface{}); ok {
 				running := 0
@@ -2577,6 +2643,12 @@ func connectToNode(node Node) {
 					}
 				}
 				updateNodeInstances(node.ID, running, len(data))
+			}
+			// The previous code created a 5-second ticker but never waited for it,
+			// causing an unrestricted get_system/get_instances request loop.
+			// Wait before the next polling cycle to keep low-spec nodes responsive.
+			if !disconnected {
+				<-ticker.C
 			}
 		}
 		conn.Close()
@@ -2736,6 +2808,8 @@ func handleFileManage(w http.ResponseWriter, r *http.Request) {
 		OldPath   string `json:"oldPath"`
 		NewPath   string `json:"newPath"`
 		Content   string `json:"content"`
+		Offset    int    `json:"offset"`
+		Limit     int    `json:"limit"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendJSON(w, map[string]interface{}{"success": false, "message": "参数解析失败"})
@@ -2752,7 +2826,7 @@ func handleFileManage(w http.ResponseWriter, r *http.Request) {
 	switch req.Operation {
 	case "list":
 		msgType = "file_list"
-		data = map[string]string{"path": req.Path}
+		data = map[string]interface{}{"path": req.Path, "offset": req.Offset, "limit": req.Limit}
 	case "download":
 		msgType = "file_download"
 		data = map[string]string{"path": req.Path}
@@ -3047,21 +3121,36 @@ func notifyReload() {
 }
 
 func startFileWatcher() {
-	ticker := time.NewTicker(300 * time.Millisecond)
+	// 热重载仅用于开发；旧实现每 300ms 递归遍历整个 static 目录，
+	// 在 HDD/VPS 上会造成持续磁盘 I/O 与 CPU 占用。
+	panelSettingsMu.RLock()
+	enabled := panelSettings.HotReload
+	panelSettingsMu.RUnlock()
+	if !enabled {
+		log.Println("[INFO] Hot reload is disabled")
+		return
+	}
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		changed := false
 		staticDir := filepath.Join(projectRoot, "go-web", "static")
-		_ = filepath.Walk(staticDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return nil
+		entries, err := os.ReadDir(staticDir)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
 			}
-			if info.IsDir() {
-				return nil
-			}
-			ext := filepath.Ext(path)
+			ext := filepath.Ext(entry.Name())
 			if ext != ".html" && ext != ".css" && ext != ".js" {
-				return nil
+				continue
+			}
+			path := filepath.Join(staticDir, entry.Name())
+			info, err := entry.Info()
+			if err != nil {
+				continue
 			}
 			modTime := info.ModTime()
 			watcherMu.Lock()
@@ -3072,8 +3161,7 @@ func startFileWatcher() {
 			}
 			lastModMap[path] = modTime
 			watcherMu.Unlock()
-			return nil
-		})
+		}
 		if changed {
 			notifyReload()
 		}
@@ -3221,30 +3309,17 @@ func main() {
 	go startNodeMonitor()
 
 	addr := fmt.Sprintf(":%d", HTTP_PORT)
-	fmt.Println()
-	fmt.Println("#     #                      ######                              ")
-	fmt.Println("##    #  ####  #    #   ##   #     #   ##   #    # ###### #      ")
-	fmt.Println("# #   # #    # #    #  #  #  #     #  #  #  ##   # #      #      ")
-	fmt.Println("#  #  # #    # #    # #    # ######  #    # # #  # #####  #      ")
-	fmt.Println("#   # # #    # #    # ###### #       ###### #  # # #      #      ")
-	fmt.Println("#    ## #    #  #  #  #    # #       #    # #   ## #      #      ")
-	fmt.Println("#     #  ####    ##   #    # #       #    # #    # ###### ###### ")
-	fmt.Println("                                                                 ")
-	fmt.Println()
-	fmt.Println(" + Copyright (C) 2026 NovaPanel <https://github.com/NovaPanel-CN/NovaPanel>")
-	fmt.Println()
-	fmt.Println(" + Version 1.0.0")
-	fmt.Println()
+	printStartupBanner("Web Panel", WEB_VER)
 	fmt.Println(" ================================")
-	log.Printf("[INFO] 控制面板端已启动")
-	log.Printf("[INFO] 访问地址: http://127.0.0.1%s", addr)
+	log.Printf("[INFO] %s", startupText("started"))
+	log.Printf("[INFO] %s: http://127.0.0.1%s", startupText("address"), addr)
 	log.Printf("[INFO] WebSocket: ws://127.0.0.1%s/ws", addr)
 	log.Printf("[INFO] 软件公网访问需开放端口 8080 与守护进程端口")
-	log.Printf("[INFO] 关闭此程序请使用 Ctrl+C 快捷键")
+	log.Printf("[INFO] %s", startupText("close"))
 	fmt.Println(" ================================")
 	fmt.Println()
 
 	if err := http.ListenAndServe(addr, corsMiddleware(http.DefaultServeMux)); err != nil {
-		log.Fatal("启动失败:", err)
+		log.Fatal(startupText("failed")+":", err)
 	}
 }

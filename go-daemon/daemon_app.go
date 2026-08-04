@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -20,7 +21,7 @@ import (
 
 const (
 	DAEMON_PORT = 8079
-	DAEMON_NAME = "NovaPanel Daemon"
+	DAEMON_NAME = "Velunex Panel Daemon"
 	DAEMON_VER  = "1.0.0"
 )
 
@@ -35,18 +36,25 @@ var (
 )
 
 type SystemInfo struct {
-	OS           string  `json:"os"`
-	Hostname     string  `json:"hostname"`
-	CpuUsage     float64 `json:"cpuUsage"`
-	CpuCores     int     `json:"cpuCores"`
-	MemTotal     float64 `json:"memTotal"`
-	MemUsed      float64 `json:"memUsed"`
-	MemPercent   float64 `json:"memPercent"`
-	DiskTotal    float64 `json:"diskTotal"`
-	DiskUsed     float64 `json:"diskUsed"`
-	DiskPercent  float64 `json:"diskPercent"`
-	Uptime       string  `json:"uptime"`
-	ProcessCount int     `json:"processCount"`
+	OS            string  `json:"os"`
+	Hostname      string  `json:"hostname"`
+	CpuUsage      float64 `json:"cpuUsage"`
+	CpuCores      int     `json:"cpuCores"`
+	MemTotal      float64 `json:"memTotal"`
+	MemUsed       float64 `json:"memUsed"`
+	MemPercent    float64 `json:"memPercent"`
+	DiskTotal     float64 `json:"diskTotal"`
+	DiskUsed      float64 `json:"diskUsed"`
+	DiskPercent   float64 `json:"diskPercent"`
+	Uptime        string  `json:"uptime"`
+	UptimeSeconds int64   `json:"uptimeSeconds"`
+	ProcessCount  int     `json:"processCount"`
+}
+
+var systemInfoCache struct {
+	sync.Mutex
+	value   SystemInfo
+	updated time.Time
 }
 
 type Instance struct {
@@ -68,6 +76,38 @@ type WSMessage struct {
 	Message string      `json:"message"`
 }
 
+func startupText(key string) string {
+	lang := os.Getenv("NOVAPANEL_LANG")
+	texts := map[string][3]string{
+		"started": {"Daemon started successfully", "守护进程现已成功启动", "守護行程現已成功啟動"},
+		"system":  {"Operating system", "操作系统", "作業系統"},
+		"config":  {"Configuration directory", "配置文件", "設定檔目錄"},
+		"close":   {"Press Ctrl+C to stop", "你可以使用 Ctrl+C 快捷键即可关闭程序", "可使用 Ctrl+C 快捷鍵關閉程式"},
+		"failed":  {"Startup failed", "启动失败", "啟動失敗"},
+	}
+	i := 0
+	if lang == "zh_cn" {
+		i = 1
+	} else if lang == "zh_tw" {
+		i = 2
+	}
+	return texts[key][i]
+}
+
+func printStartupBanner(component, version string) {
+	fmt.Println()
+	fmt.Println(`V     V  EEEEEEE  L        U     U  N     N  EEEEEEE  X     X`)
+	fmt.Println(` V   V   E        L        U     U  NN    N  E         X   X `)
+	fmt.Println(`  V V    EEEEE    L        U     U  N N   N  EEEEE      X X  `)
+	fmt.Println(`   V     E        L        U     U  N  N  N  E           X   `)
+	fmt.Println(`   V     EEEEEEE  LLLLLLL   UUUUU   N   N N  EEEEEEE   X     `)
+	fmt.Println()
+	fmt.Printf("                    Velunex Panel | %s\n", component)
+	fmt.Printf("                    Version %s\n", version)
+	fmt.Println("                    Copyright (C) 2026 Velunex Panel")
+	fmt.Println()
+}
+
 func main() {
 	initInstances()
 
@@ -77,38 +117,25 @@ func main() {
 	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			w.Write([]byte("NovaPanel Daemon v1.0.0"))
+			w.Write([]byte("Velunex Panel Daemon v1.0.0"))
 			return
 		}
 		http.NotFound(w, r)
 	})
 
 	addr := fmt.Sprintf(":%d", DAEMON_PORT)
-	fmt.Println()
-	fmt.Println("#     #                      ######                              ")
-	fmt.Println("##    #  ####  #    #   ##   #     #   ##   #    # ###### #      ")
-	fmt.Println("# #   # #    # #    #  #  #  #     #  #  #  ##   # #      #      ")
-	fmt.Println("#  #  # #    # #    # #    # ######  #    # # #  # #####  #      ")
-	fmt.Println("#   # # #    # #    # ###### #       ###### #  # # #      #      ")
-	fmt.Println("#    ## #    #  #  #  #    # #       #    # #   ## #      #      ")
-	fmt.Println("#     #  ####    ##   #    # #       #    # #    # ###### ###### ")
-	fmt.Println("                                                                 ")
-	fmt.Println()
-	fmt.Println(" + Copyright (C) 2026 NovaPanel <https://github.com/NovaPanel-CN/NovaPanel>")
-	fmt.Println()
-	fmt.Printf(" + Version %s\n", DAEMON_VER)
-	fmt.Println()
+	printStartupBanner("Daemon", DAEMON_VER)
 	fmt.Println(" ================================")
-	log.Printf("[INFO] 守护进程现已成功启动")
+	log.Printf("[INFO] %s", startupText("started"))
 	log.Printf("[INFO] WebSocket: ws://127.0.0.1%s/ws", addr)
-	log.Printf("[INFO] 操作系统: %s", runtime.GOOS)
-	log.Printf("[INFO] 配置文件：go-daemon/data/")
-	log.Printf("[INFO] 你可以使用 Ctrl+C 快捷键即可关闭程序")
+	log.Printf("[INFO] %s: %s", startupText("system"), runtime.GOOS)
+	log.Printf("[INFO] %s: go-daemon/data/", startupText("config"))
+	log.Printf("[INFO] %s", startupText("close"))
 	fmt.Println(" ================================")
 	fmt.Println()
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatal("启动失败:", err)
+		log.Fatal(startupText("failed")+":", err)
 	}
 }
 
@@ -171,7 +198,10 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			// WriteControl is safe to call concurrently with the request-response
+			// writes below. WriteMessage is not, and would panic when a client
+			// request happened at the same time as this keepalive ping.
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
 				log.Printf("⚠️ Ping 失败: %v", err)
 				return
 			}
@@ -240,6 +270,8 @@ type FileRequest struct {
 	OldPath string `json:"oldPath"`
 	NewPath string `json:"newPath"`
 	Content string `json:"content"`
+	Offset  int    `json:"offset"`
+	Limit   int    `json:"limit"`
 }
 
 // resolvePath 安全地解析路径，返回绝对路径
@@ -330,34 +362,66 @@ func handleFileList(conn *websocket.Conn, req *FileRequest) {
 		absPath = filepath.Dir(absPath)
 	}
 
-	entries, err := os.ReadDir(absPath)
+	limit := req.Limit
+	// Keep directory listings safe by default for low-spec hosts. The web UI
+	// defaults to 16 and may request a user-selected value up to 50.
+	if limit <= 0 {
+		limit = 16
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	dir, err := os.Open(absPath)
 	if err != nil {
 		conn.WriteJSON(WSMessage{Type: "file_list", Success: false, Message: "读取目录失败: " + err.Error()})
 		return
 	}
+	defer dir.Close()
 
-	files := make([]FileInfo, 0, len(entries))
-	for _, entry := range entries {
-		info, err := entry.Info()
-		if err != nil {
-			continue
+	files := make([]FileInfo, 0, limit+1)
+	skipped := 0
+	for len(files) < limit+1 {
+		entries, readErr := dir.ReadDir(min(limit+1-len(files), 128))
+		if readErr != nil && readErr != io.EOF {
+			break
 		}
-		files = append(files, FileInfo{
-			Name:    entry.Name(),
-			Path:    filepath.Join(absPath, entry.Name()),
-			Size:    info.Size(),
-			IsDir:   entry.IsDir(),
-			ModTime: info.ModTime().Format("2006-01-02 15:04:05"),
-			Mode:    info.Mode().String(),
-		})
+		for _, entry := range entries {
+			if skipped < offset {
+				skipped++
+				continue
+			}
+			info, statErr := entry.Info()
+			if statErr != nil {
+				continue
+			}
+			files = append(files, FileInfo{
+				Name: entry.Name(), Path: filepath.Join(absPath, entry.Name()), Size: info.Size(),
+				IsDir: entry.IsDir(), ModTime: info.ModTime().Format("2006-01-02 15:04:05"), Mode: info.Mode().String(),
+			})
+			if len(files) >= limit+1 {
+				break
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+	}
+	hasMore := len(files) > limit
+	if hasMore {
+		files = files[:limit]
 	}
 
 	conn.WriteJSON(WSMessage{
 		Type:    "file_list",
 		Success: true,
 		Data: map[string]interface{}{
-			"path":  absPath,
-			"files": files,
+			"path":    absPath,
+			"files":   files,
+			"hasMore": hasMore,
 		},
 	})
 }
@@ -626,6 +690,11 @@ func handleFileWrite(conn *websocket.Conn, req *FileRequest) {
 }
 
 func getSystemInfo() SystemInfo {
+	systemInfoCache.Lock()
+	defer systemInfoCache.Unlock()
+	if !systemInfoCache.updated.IsZero() && time.Since(systemInfoCache.updated) < 15*time.Second {
+		return systemInfoCache.value
+	}
 	info := SystemInfo{}
 	info.OS = runtime.GOOS
 	hostname, _ := os.Hostname()
@@ -634,8 +703,12 @@ func getSystemInfo() SystemInfo {
 	info.CpuUsage = getCPUUsage()
 	info.MemTotal, info.MemUsed, info.MemPercent = getMemoryInfo()
 	info.DiskTotal, info.DiskUsed, info.DiskPercent = getDiskInfo()
-	info.Uptime = getSystemUptime()
+	uptime := getSystemUptime()
+	info.Uptime = formatUptime(uptime)
+	info.UptimeSeconds = int64(uptime.Seconds())
 	info.ProcessCount = getProcessCount()
+	systemInfoCache.value = info
+	systemInfoCache.updated = time.Now()
 	return info
 }
 
@@ -833,7 +906,7 @@ func getDiskInfo() (total, used, percent float64) {
 	return
 }
 
-func getSystemUptime() string {
+func getSystemUptime() time.Duration {
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command("powershell", "-Command",
 			"(Get-CimInstance Win32_OperatingSystem).LastBootUpTime")
@@ -845,7 +918,7 @@ func getSystemUptime() string {
 				bootTime, err := time.Parse("20060102150405", timeStr)
 				if err == nil {
 					uptime := time.Since(bootTime)
-					return formatUptime(uptime)
+					return uptime
 				}
 			}
 		}
@@ -856,11 +929,11 @@ func getSystemUptime() string {
 			if len(fields) > 0 {
 				seconds, _ := strconv.ParseFloat(fields[0], 64)
 				uptime := time.Duration(seconds) * time.Second
-				return formatUptime(uptime)
+				return uptime
 			}
 		}
 	}
-	return "0时 0分"
+	return 0
 }
 
 func getProcessCount() int {

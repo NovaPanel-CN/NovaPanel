@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================
-# NovaPanel Linux 一键安装与管理脚本
+# Velunex Panel Linux 一键安装与管理脚本
 # 功能：检测环境 → 安装依赖 → 编译 → systemd 开机自启 → 启动
 # 支持：简体中文 / 繁體中文 / English（根据系统语言自动切换）
 # ============================================================
@@ -44,7 +44,7 @@ load_messages() {
     local lang=$(detect_lang)
     case "$lang" in
         zh_cn)
-            MSG_TITLE="NovaPanel Linux 安装脚本"
+            MSG_TITLE="Velunex Panel Linux 安装脚本"
             MSG_INSTALLING_DEPS="安装系统依赖..."
             MSG_DEPS_READY="系统依赖已就绪"
             MSG_GO_INSTALLING="正在安装 Go"
@@ -65,7 +65,7 @@ load_messages() {
             MSG_SERVICES_CREATED="systemd 服务已创建并启用开机自启"
             MSG_STARTING_SERVICES="正在启动服务..."
             MSG_SERVICES_STARTED="服务已启动"
-            MSG_INSTALL_DONE="NovaPanel 安装完成！"
+            MSG_INSTALL_DONE="Velunex Panel 安装完成！"
             MSG_PANEL_ADDR="面板地址"
             MSG_DAEMON_ADDR="Daemon"
             MSG_MGMT_CMDS="服务管理命令"
@@ -87,7 +87,7 @@ load_messages() {
             MSG_INSTALL_GO_PROXY="中国大陆设置 Go 代理"
             ;;
         zh_tw)
-            MSG_TITLE="NovaPanel Linux 安裝腳本"
+            MSG_TITLE="Velunex Panel Linux 安裝腳本"
             MSG_INSTALLING_DEPS="安裝系統相依套件..."
             MSG_DEPS_READY="系統相依套件已就緒"
             MSG_GO_INSTALLING="正在安裝 Go"
@@ -108,7 +108,7 @@ load_messages() {
             MSG_SERVICES_CREATED="systemd 服務已建立並啟用開機自啟"
             MSG_STARTING_SERVICES="正在啟動服務..."
             MSG_SERVICES_STARTED="服務已啟動"
-            MSG_INSTALL_DONE="NovaPanel 安裝完成！"
+            MSG_INSTALL_DONE="Velunex Panel 安裝完成！"
             MSG_PANEL_ADDR="面板位址"
             MSG_DAEMON_ADDR="Daemon"
             MSG_MGMT_CMDS="服務管理指令"
@@ -130,7 +130,7 @@ load_messages() {
             MSG_INSTALL_GO_PROXY="中國大陸設定 Go 代理"
             ;;
         *)
-            MSG_TITLE="NovaPanel Linux Install Script"
+            MSG_TITLE="Velunex Panel Linux Install Script"
             MSG_INSTALLING_DEPS="Installing system dependencies..."
             MSG_DEPS_READY="System dependencies ready"
             MSG_GO_INSTALLING="Installing Go"
@@ -151,7 +151,7 @@ load_messages() {
             MSG_SERVICES_CREATED="systemd services created and enabled"
             MSG_STARTING_SERVICES="Starting services..."
             MSG_SERVICES_STARTED="Services started"
-            MSG_INSTALL_DONE="NovaPanel installation complete!"
+            MSG_INSTALL_DONE="Velunex Panel installation complete!"
             MSG_PANEL_ADDR="Panel URL"
             MSG_DAEMON_ADDR="Daemon"
             MSG_MGMT_CMDS="Service Management Commands"
@@ -350,7 +350,7 @@ create_services() {
     # 面板服务
     sudo tee /etc/systemd/system/nova-panel.service > /dev/null <<'EOF'
 [Unit]
-Description=NovaPanel Web Panel
+Description=Velunex Panel Web Panel
 After=network.target
 
 [Service]
@@ -367,7 +367,7 @@ EOF
     # Daemon 服务
     sudo tee /etc/systemd/system/nova-daemon.service > /dev/null <<'EOF'
 [Unit]
-Description=NovaPanel Daemon
+Description=Velunex Panel Daemon
 After=network.target
 
 [Service]

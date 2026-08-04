@@ -1,6 +1,6 @@
-# NovaPanel English Language File
-app.title=NovaPanel - Next Gen Panel
-app.loading=Loading NovaPanel...
+# Velunex Panel English Language File
+app.title=Velunex Panel - Next Gen Panel
+app.loading=Loading Velunex Panel...
 app.subtitle=Next Gen Panel · Lightweight · Efficient
 
 common.save=Save
@@ -42,7 +42,7 @@ sidebar.settings=Settings
 sidebar.admin=Administrator
 sidebar.user=User
 
-welcome.title=Welcome to NovaPanel
+welcome.title=Welcome to Velunex Panel
 welcome.start=✨ Get Started
 
 create.title=Create Admin Account
@@ -162,7 +162,7 @@ settings.panelInfo=Panel Info
 settings.panelConfig=Panel Config
 settings.security=Security
 settings.appearance=Appearance
-settings.about=About NovaPanel
+settings.about=About Velunex Panel
 settings.language=Panel Language
 settings.languageHint=Select panel interface language
 settings.panelName=Panel Name
@@ -211,9 +211,9 @@ settings.bgEmpty=No background, please upload
 settings.uploadBg=📤 Upload Background
 settings.bgOpacity=Background Opacity
 settings.saveAppearance=💾 Save Appearance
-settings.aboutDesc=NovaPanel is a lightweight, efficient Minecraft server management panel
+settings.aboutDesc=Velunex Panel is a lightweight, efficient Minecraft server management panel
 settings.openSource=Open Source
-settings.copyright=© 2026 NovaPanel. All rights reserved.
+settings.copyright=© 2026 Velunex Panel. All rights reserved.
 
 profile.title=Profile
 profile.subtitle=View and edit your personal information

@@ -1,6 +1,6 @@
-# NovaPanel 简体中文语言文件
-app.title=NovaPanel - 新一代面板
-app.loading=NovaPanel 加载中...
+# Velunex Panel 简体中文语言文件
+app.title=Velunex Panel - 新一代面板
+app.loading=Velunex Panel 加载中...
 app.subtitle=新一代面板 · 轻量 · 高效
 
 common.save=保存
@@ -42,7 +42,7 @@ sidebar.settings=设置
 sidebar.admin=管理员
 sidebar.user=普通用户
 
-welcome.title=欢迎使用 NovaPanel
+welcome.title=欢迎使用 Velunex Panel
 welcome.start=✨ 开始使用
 
 create.title=创建管理员账号
@@ -162,7 +162,7 @@ settings.panelInfo=面板信息
 settings.panelConfig=面板配置
 settings.security=安全设置
 settings.appearance=自定义外观
-settings.about=关于 NovaPanel
+settings.about=关于 Velunex Panel
 settings.language=面板语言
 settings.languageHint=选择面板界面显示语言
 settings.panelName=面板名称
@@ -211,9 +211,9 @@ settings.bgEmpty=暂无背景，请上传
 settings.uploadBg=📤 上传背景
 settings.bgOpacity=背景透明度
 settings.saveAppearance=💾 保存外观设置
-settings.aboutDesc=NovaPanel 是一个轻量、高效的 Minecraft 服务器管理面板
+settings.aboutDesc=Velunex Panel 是一个轻量、高效的 Minecraft 服务器管理面板
 settings.openSource=开源地址
-settings.copyright=© 2026 NovaPanel. 保留所有权利.
+settings.copyright=© 2026 Velunex Panel. 保留所有权利.
 
 profile.title=个人信息
 profile.subtitle=查看和修改你的个人资料

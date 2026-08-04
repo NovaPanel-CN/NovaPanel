@@ -1,0 +1,17 @@
+{
+ "users": {
+  "missqwq": {
+   "uuid": "818d1832b5e243059d38e23d32100ba7",
+   "username": "missqwq",
+   "password": "Missqwq520_",
+   "permission": 10,
+   "avatar": "missqwq.png",
+   "email": "",
+   "bio": "",
+   "createdAt": "2026-08-03 21:52:51",
+   "lastLogin": "2026-08-04 10:32:50",
+   "twoFASecret": "",
+   "twoFAEnabled": false
+  }
+ }
+}
