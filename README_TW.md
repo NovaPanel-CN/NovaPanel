@@ -15,9 +15,11 @@
 </p>
 
 ---
+<div align="center">
 
 [English](README.md) - [简体中文](README_ZH.md) - [繁體中文](README_TW.md)
 
+</div>
 ---
 
 <table>
